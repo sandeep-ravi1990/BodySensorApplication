@@ -36,6 +36,7 @@ public class MainActivity extends ListActivity {
 	protected static final int STOP = 1;
 	protected static final int SURVEY = 2;
 	protected static final int STATE = 3;
+	protected static final int CONNECTIONS = 4;
 	
 	
     @Override
@@ -44,7 +45,7 @@ public class MainActivity extends ListActivity {
         //setContentView(R.layout.activity_main);
         
     	String[] options = {"Start Service", "Stop Service", "Survey Menu",
-		"Check Bluetooth State"};
+		"Check Bluetooth State","Connections"};
     	
     	ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
     			android.R.layout.simple_list_item_1, options);
@@ -68,6 +69,9 @@ public class MainActivity extends ListActivity {
 	    			break;
 	    		case STATE: 
 	    			getState();
+	    			break;
+	    		case CONNECTIONS:
+	    			startConnections();
 	    			break;
 		    	}
 			}
@@ -100,6 +104,11 @@ public class MainActivity extends ListActivity {
 		startActivity(i);
     }
     
+    private void startConnections(){
+		Intent i = new Intent(getApplicationContext(), SensorConnections.class);
+		startActivity(i);
+    }
+    
     private void stopSService() {
     	mIsRunning = false;
     	this.stopService(new Intent(MainActivity.this,SensorService.class));
@@ -108,6 +117,8 @@ public class MainActivity extends ListActivity {
         if (! mIsRunning) {
             mIsRunning = true;
             this.startService(new Intent(MainActivity.this,SensorService.class));
+            
+            
         }
     }
     
