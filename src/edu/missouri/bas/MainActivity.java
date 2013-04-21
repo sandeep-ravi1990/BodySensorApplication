@@ -37,12 +37,13 @@ public class MainActivity extends ListActivity {
 	protected static final int SURVEY = 2;
 	protected static final int STATE = 3;
 	protected static final int CONNECTIONS = 4;
-	
+	public  final MainActivity thisActivity = this;
 	
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         //setContentView(R.layout.activity_main);
+       
         
     	String[] options = {"Start Service", "Stop Service", "Survey Menu",
 		"Check Bluetooth State","Connections"};

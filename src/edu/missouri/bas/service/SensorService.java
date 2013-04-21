@@ -717,6 +717,8 @@ public class SensorService extends Service {
 				handleBluetooth(p);
 			}
 			else if(msg.what == BluetoothRunnable.MessageCode.DISCONNECTED){
+				Intent i=new Intent();
+				
 				BluetoothDevice device = (BluetoothDevice) msg.obj;
 				Toast.makeText(serviceContext, "Lost connection to device: "+device.getName(),
 						Toast.LENGTH_LONG).show();
@@ -735,7 +737,10 @@ public class SensorService extends Service {
 				
 				switch(newState) {
 					case BluetoothRunnable.BluetoothState.CONNECTED:
-						newStateString = "Connected to: "+deviceName;						
+						newStateString = "Connected to: "+deviceName;	
+						Intent h=new Intent("fucku");
+						h.putExtra("State_Change",newStateString);
+						serviceContext.sendBroadcast(h);
 						break;
 					case BluetoothRunnable.BluetoothState.CONNECTING:
 						newStateString = "Attempting to connect to: "+deviceName;						

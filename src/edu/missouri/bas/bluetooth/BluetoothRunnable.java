@@ -6,7 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Calendar;
 import java.util.UUID;
-
+import edu.missouri.bas.SensorConnections;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
@@ -16,7 +16,8 @@ import android.os.Handler;
 import android.util.Log;
 
 
-public abstract class BluetoothRunnable implements Runnable{
+
+public abstract  class BluetoothRunnable implements Runnable{
 
 	protected final boolean D = true;
 	private static final String TAG = "BluetoothRunnable";
@@ -32,7 +33,7 @@ public abstract class BluetoothRunnable implements Runnable{
 	
 	protected Handler mHandler;
 	
-	protected int mState;
+	protected static int mState;
 	protected int mMode;
 	protected final int mSocketType;
 
@@ -47,8 +48,11 @@ public abstract class BluetoothRunnable implements Runnable{
 	protected FileWriter fileWriter;
 	protected BufferedWriter bufferedWriter;
 	protected File outputFile;
-	
+	public static final String ACTION_STATE_CHANGE = "ACTION_BLUETOOTH_STATE";	
 	public Calendar cal;
+	public Handler bluetoothHandler;
+	
+	 
 	
 	public BluetoothRunnable(Handler handler, BluetoothDevice device,
 			UUID uuid, int mode, int type,
@@ -74,7 +78,12 @@ public abstract class BluetoothRunnable implements Runnable{
 		}	
 		cal = Calendar.getInstance();
 		cal.setTimeInMillis(System.currentTimeMillis());
+		SensorConnections sc=new SensorConnections();
+		bluetoothHandler=sc.stateHandler;
+		
 	}
+	
+	
 	
 	
 	public void run() {
@@ -92,6 +101,7 @@ public abstract class BluetoothRunnable implements Runnable{
 			 * retryCheck may need to sleep or something in between attempts.
 			 */
 			retry = retryCheck();
+			
 			
 			
 			/*
@@ -200,7 +210,13 @@ public abstract class BluetoothRunnable implements Runnable{
 		Bundle states = getStateBundle();
 		states.putInt(KEY_NEW_STATE, newState);
 		if(mHandler != null) mHandler.obtainMessage(MessageCode.STATE_CHANGED, states);
-		mState = newState;
+		mState = newState;		
+		bluetoothHandler.obtainMessage(SensorConnections.MESSAGE_STATE_CHANGE,newState,-1).sendToTarget();
+        
+		
+		
+		
+		
 	}
 	
 	public Bundle getStateBundle() {
@@ -301,6 +317,7 @@ public abstract class BluetoothRunnable implements Runnable{
 			
 			//Also set the state to failed for logging/debugging
 			e.printStackTrace();
+			
 		}
 		
 		/*
@@ -478,7 +495,7 @@ public abstract class BluetoothRunnable implements Runnable{
 		private MessageCode(){ }
 	}
 
-	public int getState() {
+	public static int getState() {
 		return mState;
 	}
 	

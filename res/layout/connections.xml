@@ -15,7 +15,7 @@
             android:id="@+id/tvSetWristStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="not connected"
+            android:text="Not Connected"
             android:textAppearance="?android:attr/textAppearanceSmall" />
         
     </TableRow>
@@ -40,7 +40,7 @@
             android:id="@+id/tvSetChestStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="not connected"
+            android:text="Not Connected"
             android:textAppearance="?android:attr/textAppearanceSmall" />
         
     </TableRow>
@@ -72,7 +72,11 @@
       
   </TableRow>
 
-      
+      <Button
+          android:id="@+id/btnCheckState"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          android:text="Referesh" />
  
   
       
