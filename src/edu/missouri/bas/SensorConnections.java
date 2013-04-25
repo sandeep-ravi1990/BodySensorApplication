@@ -2,6 +2,8 @@ package edu.missouri.bas;
 
 
 
+import com.equivital.sdk.connection.SemBluetoothConnection;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -23,7 +25,7 @@ import edu.missouri.bas.service.SensorService;
 
 public class SensorConnections extends Activity {
 	static TextView tvSetWristStatus;
-	TextView tvSetChestStatus;
+	static TextView tvSetChestStatus;
 	Button 	 btnConnectWrist;
 	Button   btnConnectChest;
 	Button   btnCheckState;
@@ -31,7 +33,8 @@ public class SensorConnections extends Activity {
 	public static final int INTENT_CONNECT_WRIST = 0;
 	public static final int INTENT_CONNECT_CHEST = 1;
 	protected static final String TAG = "SensorConnections";	
-	public static final int MESSAGE_STATE_CHANGE = 1;
+	public static final int MESSAGE_STATE_CHANGE = 2;
+	public static final int BLUETOOTH_STATE_CHANGE = 3;
 	
 	BluetoothAdapter btAdapter=BluetoothAdapter.getDefaultAdapter();
 	@Override
@@ -40,6 +43,7 @@ public class SensorConnections extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.connections);
 		tvSetWristStatus=(TextView)findViewById(R.id.tvSetWristStatus);	
+		tvSetChestStatus=(TextView)findViewById(R.id.tvSetChestStatus);	
 		int state=BluetoothRunnable.getState();
 		switch(state)
 		{
@@ -69,6 +73,29 @@ public class SensorConnections extends Activity {
 		    tvSetWristStatus.setText("An error has occured");
 			break;
 		}
+		
+		 int chestSensorState=SemBluetoothConnection.getState();
+		 switch (chestSensorState) {
+         case SemBluetoothConnection.STATE_CONNECTED:
+         	tvSetChestStatus.setText("Connected");	
+         	Log.d("BluetoothState from Handler","Connected" );
+				break;
+			case SemBluetoothConnection.STATE_CONNECTING:
+				tvSetChestStatus.setText("Attempting to Connect...");					
+				break;
+			
+			case SemBluetoothConnection.STATE_LISTEN:
+				tvSetChestStatus.setText("Listening for a Connection...");
+				break;
+			case SemBluetoothConnection.STATE_NONE:
+				tvSetChestStatus.setText("Not Connected");
+				break;
+			
+			default: 
+				tvSetChestStatus.setText("An error has occured");
+				break;
+         
+         }
 		tbBluetooth = (ToggleButton) findViewById(R.id.tbBluetooth);
 		btnConnectWrist=(Button)findViewById(R.id.btnConnectWrist);
 		btnConnectChest=(Button)findViewById(R.id.btnConnectChest);
@@ -206,9 +233,12 @@ public class SensorConnections extends Activity {
 				BluetoothDevice device = btAdapter.getRemoteDevice(address);
 				if(device.getName().contains("EQ"))
 				{
-				
-					ChestSensor cs=new ChestSensor();
-					cs.connectoChestSensor(address);
+					Toast.makeText(getApplicationContext(), "Entered the loop",Toast.LENGTH_LONG).show();
+					Intent connectChest = new Intent(SensorService.ACTION_CONNECT_CHEST);	
+					connectChest.putExtra(SensorService.KEY_ADDRESS,address);
+					this.sendBroadcast(connectChest);
+					
+					
 					
 				
 				}
@@ -284,6 +314,40 @@ public class SensorConnections extends Activity {
         }
     };
 	
+    public static final Handler chestSensorHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+           if(msg.what==BLUETOOTH_STATE_CHANGE) 
+        	   {
+                switch (msg.arg1) {
+                case SemBluetoothConnection.STATE_CONNECTED:
+                	tvSetChestStatus.setText("Connected");	
+                	Log.d("BluetoothState from Handler","Connected" );
+					break;
+				case SemBluetoothConnection.STATE_CONNECTING:
+					tvSetChestStatus.setText("Attempting to Connect...");					
+					break;
+				
+				case SemBluetoothConnection.STATE_LISTEN:
+					tvSetChestStatus.setText("Listening for a Connection...");
+					break;
+				case SemBluetoothConnection.STATE_NONE:
+					tvSetChestStatus.setText("Not Connected");
+					break;
+				
+				default: 
+					tvSetChestStatus.setText("An error has occured");
+					break;
+                
+                }
+                
+            
+            
+                
+               
+            }
+        }
+    };
 	
 	
 	

@@ -9,10 +9,14 @@ import java.util.Vector;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.os.Handler;
+
 import com.equivital.sdk.ISemConnection;
 import com.equivital.sdk.ISemConnectionEvents;
 import com.equivital.sdk.ISemConnectionManager;
 import com.equivital.sdk.SemDataReceivedEventArgs;
+
+import edu.missouri.bas.SensorConnections;
 
 /**
  * Implementation of the Equivital ISemConnection interface for the Android Bluetooth Stack 
@@ -27,13 +31,14 @@ public class SemBluetoothConnection implements ISemConnection
     private final BluetoothAdapter mBluetoothAdapter;
     private ConnectThread mConnectThread;
     private ConnectedThread mConnectedThread;
-    private int mState;
+    private static int mState;
     private String iConnectedBluetoothDeviceAddress = "";
     private String iConnectedBluetoothDeviceName = "";
     private Vector<ISemConnectionEvents> _eventHandlers = new Vector<ISemConnectionEvents>();
 	private Vector<ISemBluetoothConnectionEvents> _eventHandlersBT = new Vector<ISemBluetoothConnectionEvents>();
 	private String _portAddress = "";
 	private SemDataReceivedEventArgs _args = new SemDataReceivedEventArgs();
+	protected Handler sensorHandler;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
@@ -142,6 +147,7 @@ public class SemBluetoothConnection implements ISemConnection
 	public static ISemConnection createConnection(String deviceAddress)
 	{
 		return new SemBluetoothConnection(deviceAddress);
+		
 	}
 	
 	/**
@@ -162,6 +168,7 @@ public class SemBluetoothConnection implements ISemConnection
         mState = STATE_NONE;
         
         if(address != null) connectToDeviceWithAddress(address);
+        
 	}	
 	
 	/**
@@ -387,10 +394,13 @@ public class SemBluetoothConnection implements ISemConnection
    
     private synchronized void setState(int state)
     {
-        mState = state;
+        mState = state;        
+        sensorHandler=SensorConnections.chestSensorHandler;
+        sensorHandler.obtainMessage(SensorConnections.BLUETOOTH_STATE_CHANGE,state,-1).sendToTarget();
+        
     }
 
-    private synchronized int getState()
+    public static synchronized int getState()
     {
         return mState;
     }
@@ -598,5 +608,8 @@ public class SemBluetoothConnection implements ISemConnection
             {
             }
         }
-    }	    
+    }
+
+
+	   
 }

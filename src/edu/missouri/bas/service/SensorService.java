@@ -41,6 +41,7 @@ import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -51,9 +52,20 @@ import android.os.Vibrator;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.equivital.sdk.ISemConnection;
+import com.equivital.sdk.connection.SemBluetoothConnection;
+import com.equivital.sdk.decoder.BadLicenseException;
+import com.equivital.sdk.decoder.SDKLicense;
+import com.equivital.sdk.decoder.SemDevice;
+import com.equivital.sdk.decoder.events.ISemDeviceSummaryEvents;
+import com.equivital.sdk.decoder.events.ISemDeviceTimingEvents;
+import com.equivital.sdk.decoder.events.SEMDateTimeDataEventArgs;
+import com.equivital.sdk.decoder.events.SemSummaryDataEventArgs;
+import com.equivital.sdk.decoder.events.SynchronisationTimerEventArgs;
 
 
-public class SensorService extends Service {
+
+public class SensorService extends Service  implements ISemDeviceTimingEvents, ISemDeviceSummaryEvents {
 
     private final String TAG = "SensorService";
 	
@@ -81,7 +93,7 @@ public class SensorService extends Service {
 	/*
 	 * File I/O Variables 
 	 */
-	private final String BASE_PATH = "sdcard/TestResults/";
+	private final String BASE_PATH = "/sdcard/TestResults/";
 	private final String[] surveyNames = {"CRAVING_EPISODE","DRINKING_FOLLOWUP",
 			"MORNING_REPORT","RANDOM_ASSESSMENT","MOOD_DYSREGULATION","INITIAL_DRINKING"};
 	private HashMap<String, String> surveyFiles;
@@ -145,6 +157,14 @@ public class SensorService extends Service {
 	
 	public static final String Listening ="Listening";
 	
+	public static final String ACTION_CONNECT_CHEST = "INTENT_ACTION_CONNECT_CHEST";
+	
+	public static final String KEY_ADDRESS = "KEY_ADDRESS";
+	
+	public static final int CHEST_SENSOR_DATA = 109;
+	
+	
+	
 	
 	
 	/*
@@ -165,6 +185,8 @@ public class SensorService extends Service {
 	
 	Notification mainServiceNotification;
 	public static final int SERVICE_NOTIFICATION_ID = 1;
+	
+	private static SemDevice device;
 
 	
 	/*
@@ -213,7 +235,7 @@ public class SensorService extends Service {
 		 * Setup notification manager
 		 */
 
-		notification = new Notification(R.drawable.icon,"Recorded",System.currentTimeMillis());
+		notification = new Notification(R.drawable.icon2,"Recorded",System.currentTimeMillis());
 		notification.defaults=0; 
 		notification.flags|=Notification.FLAG_ONGOING_EVENT;
 		notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -278,9 +300,17 @@ public class SensorService extends Service {
 		}
 		prepareAlarms();
 		//prepareBluetooth();
+				
+		SDKLicense sdk = SemDevice.getLicense();
+		sdk.applicationName = "Test Harness";
+		sdk.developerName = "Java Version";
+		sdk.licenseCode = "ZAP0Q9FLGo/XwrdBBAtdFk8jK7i/6fXFMzKiaCtC7jNvChtpMoOxSaH7tdqtFkmMbjUaskRyLGFCTGVJdNlrFjfbBjSGng9NGL4pnJ49TRTNR8Zmq0E9wnydpo3Du8RAcBVdGYjTjTctplrJ/cYHPHxOnbY5QuHYkY3dXBF3CSE=";
+		
 	}
 	
 	
+	
+
 	private void prepareAlarms(){
 		//Intent schedulePicture = new Intent(SensorService.ACTION_SCHEDULE_PICTURE);
 		//Intent scheduleAudio = new Intent(SensorService.ACTION_SCHEDULE_AUDIO);
@@ -334,6 +364,16 @@ public class SensorService extends Service {
 		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothConnect);
 		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothDisconnect);
 		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothUpdate);
+		
+		
+		/*Chest Sensor Intent Filter*/
+		
+		IntentFilter chestSensorData = new IntentFilter(ACTION_CONNECT_CHEST);
+		SensorService.this.registerReceiver(chestSensorReceiver,chestSensorData);
+		
+		
+		
+		
 
 	}
 	
@@ -401,6 +441,7 @@ public class SensorService extends Service {
 		
 		SensorService.this.unregisterReceiver(alarmReceiver);
 		SensorService.this.unregisterReceiver(bluetoothReceiver);
+		SensorService.this.unregisterReceiver(chestSensorReceiver);
 		
 		mAlarmManager.cancel(scheduleSurvey);
 		mAlarmManager.cancel(scheduleSensor);
@@ -411,6 +452,9 @@ public class SensorService extends Service {
 		Log.d(TAG,"Service Stopped.");
 		
 		super.onDestroy();
+		if(device!=null){
+		device.stop();
+		}
 	}
 	
 	BroadcastReceiver alarmReceiver = new BroadcastReceiver() {
@@ -563,6 +607,14 @@ public class SensorService extends Service {
 		fw.write(toWrite);
 		fw.close();
 	}
+	
+	/*protected void writeDataToFile(File f, String toWrite) throws IOException{
+		FileWriter fw = new FileWriter(f, true);
+		fw.append(toWrite);
+	    fw.append('\n');
+        fw.flush();
+		fw.close();
+	}*/
 	
 	protected List<NameValuePair> parseMapToList(HashMap<String, List<String>> map){
 		Calendar cal = Calendar.getInstance();
@@ -808,4 +860,114 @@ public class SensorService extends Service {
 			}
 		}
 	};
+	
+	/*Chest Sensor Code Starts From Here */
+	
+	BroadcastReceiver chestSensorReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			String action = intent.getAction();
+			if(action.equals(SensorService.ACTION_CONNECT_CHEST)){
+				Toast.makeText(getApplicationContext(),"Intent Received",Toast.LENGTH_LONG).show();
+				String address=intent.getStringExtra(KEY_ADDRESS);
+				try
+				{
+					device = new SemDevice();
+					device.setSummaryDataEnabled(true);
+				} 
+				catch (BadLicenseException e1)
+				{
+					Toast.makeText(getApplicationContext(),"ERROR:License Code and Developer Name don't match",Toast.LENGTH_LONG).show();
+					return;
+				}		
+				
+					connectToDevice(address);
+			}
+		}
+		
+	};
+
+	private void connectToDevice(String address) {
+		Toast.makeText(getApplicationContext(), "Trying to connect to the device",Toast.LENGTH_LONG).show();
+	   	Log.d(TAG,"Entered connectToDevice Method");
+		// TODO Auto-generated method stub
+	    device.addSummaryEventListener(this);
+		device.addTimingEventListener(this);
+		ISemConnection connection = SemBluetoothConnection.createConnection(address);	
+		device.start(connection);	
+	}
+
+	@Override
+	public void summaryDataUpdated(SemDevice arg0, SemSummaryDataEventArgs arg1) {
+		// TODO Auto-generated method stub
+		updateSummary(arg1.getSummary().getMotion().name(),arg1.getSummary().getOrientation().name(),
+				arg1.getSummary().getBreathingRate().getBeltSensorRate(),
+				arg1.getSummary().getBreathingRate().getEcgDerivedRate(),arg1.getSummary().getBreathingRate().getImpedanceRate(),
+				arg1.getSummary().getHeartRate().getEcgRate(),arg1.getSummary().getQualityConfidence().getBeltQuality(),
+				arg1.getSummary().getQualityConfidence().getECGQuality(),
+				arg1.getSummary().getQualityConfidence().getImpedanceQuality(),
+				arg1.getSummary().getQualityConfidence().getHeartRateConfidence(),
+				arg1.getSummary().getQualityConfidence().getBreathingRateConfidence());
+		
+	}
+
+	private void updateSummary(String motion, String bodyPosition,
+			double beltSensorRate, double ecgDerivedRate, double impedanceRate,
+			double ecgRate, double beltQuality, double ecgQuality,
+			double impedanceQuality, double heartRateConfidence,
+			double breathingRateConfidence) {
+		// TODO Auto-generated method stub
+		 String dataFromChestSensor=motion+","+bodyPosition+","+String.valueOf(beltSensorRate)+","+String.valueOf(ecgDerivedRate)+","+
+				 String.valueOf(impedanceRate)+","+String.valueOf(ecgRate)+","+String.valueOf(beltQuality)+","+String.valueOf(ecgQuality)+","+
+				 String.valueOf(impedanceQuality)+","+String.valueOf(heartRateConfidence)+","+String.valueOf(breathingRateConfidence);	
+		 Message msgData=new Message();
+		 msgData.what = CHEST_SENSOR_DATA;
+		 Bundle dataBundle = new Bundle();
+		 dataBundle.putString("DATA",dataFromChestSensor);
+		 msgData.obj=dataBundle;
+		 chestSensorDataHandler.sendMessage(msgData);
+	}
+	
+	Handler chestSensorDataHandler = new Handler(){
+		@Override
+		public void handleMessage(Message msg){
+			if(msg.what==CHEST_SENSOR_DATA)
+			{
+				Bundle resBundle =  (Bundle)msg.obj;
+				writeChestSensorDatatoCSV(String.valueOf(resBundle.getString("DATA")));
+				
+			}
+			
+		}
+		
+	};
+
+	private void writeChestSensorDatatoCSV(String chestSensorData) {
+		// TODO Auto-generated method stub
+		Toast.makeText(serviceContext,"Trying to write to the file",Toast.LENGTH_LONG).show();
+		
+        File f = new File(BASE_PATH,"chestsensordata.txt");		
+		String dataToWrite = System.currentTimeMillis()+","+chestSensorData;
+		if(f != null){
+			try {
+				writeToFile(f, dataToWrite);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}	
+	}
+
+	@Override
+	public void semDateTimeDataReceived(SemDevice arg0,
+			SEMDateTimeDataEventArgs arg1) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void synchronisationTimerDataReceived(SemDevice arg0,
+			SynchronisationTimerEventArgs arg1) {
+		// TODO Auto-generated method stub
+		
+	}
 }

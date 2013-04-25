@@ -3,10 +3,7 @@ package edu.missouri.bas;
 import android.app.Activity;
 import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -26,6 +23,7 @@ import edu.missouri.bas.survey.XMLSurveyMenu;
 public class MainActivity extends ListActivity {
 
 	private boolean mIsRunning=false;
+	
 	private BluetoothAdapter mAdapter= BluetoothAdapter.getDefaultAdapter();	
 	private final static String TAG = "SensorServiceActivity";	
 	public static final int REQUEST_ENABLE_BT = 3;
@@ -34,9 +32,8 @@ public class MainActivity extends ListActivity {
 	public static final int INTENT_VIEW_DEVICES = 2;	
 	protected static final int START = 0;
 	protected static final int STOP = 1;
-	protected static final int SURVEY = 2;
-	protected static final int STATE = 3;
-	protected static final int CONNECTIONS = 4;
+	protected static final int SURVEY = 2;	
+	protected static final int CONNECTIONS = 3;
 	public  final MainActivity thisActivity = this;
 	
     @Override
@@ -46,7 +43,7 @@ public class MainActivity extends ListActivity {
        
         
     	String[] options = {"Start Service", "Stop Service", "Survey Menu",
-		"Check Bluetooth State","Connections"};
+		"External Sensor Connections"};
     	
     	ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
     			android.R.layout.simple_list_item_1, options);
@@ -67,10 +64,7 @@ public class MainActivity extends ListActivity {
 	    			break;
 	    		case SURVEY: 
 	    			startSurveyMenu();
-	    			break;
-	    		case STATE: 
-	    			getState();
-	    			break;
+	    			break;	    		
 	    		case CONNECTIONS:
 	    			startConnections();
 	    			break;
@@ -92,12 +86,11 @@ public class MainActivity extends ListActivity {
             startActivity(enableIntent);
         }
         
-        IntentFilter intentFilter = new IntentFilter(SensorService.ACTION_BLUETOOTH_STATE_RESULT);
-        this.registerReceiver(bluetoothReceiver, intentFilter);
+       
         
         startSService();
                 
-        getState();
+        
     }
     
     private void startSurveyMenu(){
@@ -111,14 +104,15 @@ public class MainActivity extends ListActivity {
     }
     
     private void stopSService() {
-    	mIsRunning = false;
+    	mIsRunning = false;    	
     	this.stopService(new Intent(MainActivity.this,SensorService.class));
+    	 
     }
     private void startSService() {
         if (! mIsRunning) {
-            mIsRunning = true;
-            this.startService(new Intent(MainActivity.this,SensorService.class));
-            
+            mIsRunning = true;            
+	         this.startService(new Intent(MainActivity.this,SensorService.class));
+	            
             
         }
     }
@@ -219,28 +213,14 @@ public class MainActivity extends ListActivity {
 		return true;
 	}
 	
-	protected void getState(){
-			Intent i = new Intent(SensorService.ACTION_GET_BLUETOOTH_STATE);
-			this.sendBroadcast(i);
-	}
+	
 
 	@Override
 	public void onDestroy(){
-		this.unregisterReceiver(bluetoothReceiver);
+	
 		super.onDestroy();
 	}
 	
-	BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			String action = intent.getAction();
-			if(action.equals(SensorService.ACTION_BLUETOOTH_STATE_RESULT)){
-				Log.d(TAG,"Got bluetooth state change");
-				String stateInformation = intent.getStringExtra(SensorService.INTENT_EXTRA_BT_STATE);
-				Toast.makeText(getApplicationContext(), stateInformation, Toast.LENGTH_LONG).show();
-			}
-			
-		}
-	};
+	
 }
 
