@@ -3,9 +3,11 @@ package edu.missouri.bas.service;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +95,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	/*
 	 * File I/O Variables 
 	 */
-	private final String BASE_PATH = "/sdcard/TestResults/";
+	private final String BASE_PATH = "sdcard/TestResults/";
 	private final String[] surveyNames = {"CRAVING_EPISODE","DRINKING_FOLLOWUP",
 			"MORNING_REPORT","RANDOM_ASSESSMENT","MOOD_DYSREGULATION","INITIAL_DRINKING"};
 	private HashMap<String, String> surveyFiles;
@@ -604,7 +606,8 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	
 	protected void writeToFile(File f, String toWrite) throws IOException{
 		FileWriter fw = new FileWriter(f, true);
-		fw.write(toWrite);
+		fw.write(toWrite+'\n');		
+        fw.flush();
 		fw.close();
 	}
 	
@@ -944,9 +947,13 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 
 	private void writeChestSensorDatatoCSV(String chestSensorData) {
 		// TODO Auto-generated method stub
-		Toast.makeText(serviceContext,"Trying to write to the file",Toast.LENGTH_LONG).show();
-		
-        File f = new File(BASE_PATH,"chestsensordata.txt");		
+		//Toast.makeText(serviceContext,"Trying to write to the file",Toast.LENGTH_LONG).show();
+		Calendar c=Calendar.getInstance();
+		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+		String dateObj =curFormater.format(c.getTime()); 
+		String file_name="chestsensor"+dateObj+".txt";
+		Toast.makeText(serviceContext,file_name,Toast.LENGTH_LONG).show();		
+        File f = new File(BASE_PATH,file_name);		
 		String dataToWrite = System.currentTimeMillis()+","+chestSensorData;
 		if(f != null){
 			try {

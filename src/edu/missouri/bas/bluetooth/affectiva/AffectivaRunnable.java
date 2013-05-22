@@ -16,6 +16,7 @@ public class AffectivaRunnable extends BluetoothRunnable {
 
 	private static final String TAG = "AffectivaRunnable";
 	private final static String FILE_HEADER="date,SeqNum,AccelZ,AccelY,AccelX,Battery,Temp,EDA";
+	private final String BASE_PATH = "sdcard/TestResults/";
 	
 	public static final String INTENT_ACTION_AFFECTIVA_DATA = "INTENT_AFFECTIVA_DATA";
 	
