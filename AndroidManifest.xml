@@ -31,6 +31,17 @@
             android:label="@string/title_activity_main"
             android:theme="@android:style/Theme.Holo" >
             <intent-filter>
+                <action android:name="android.intent.action.MAINACTIVITY" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        
+        <activity
+            android:name=".SurveyScheduler"
+            android:label="@string/title_activity_main"
+            android:theme="@android:style/Theme.Holo" >
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />

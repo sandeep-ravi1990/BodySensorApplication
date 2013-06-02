@@ -4,11 +4,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.xml.sax.InputSource;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -36,6 +39,7 @@ import edu.missouri.bas.survey.question.SurveyQuestion;
  */
 //TODO: Add previous question button to go back
 //TODO: Allow multiple questions to be displayed at a once
+
 
 public class XMLSurveyActivity extends Activity {
 	
@@ -89,6 +93,13 @@ public class XMLSurveyActivity extends Activity {
      * TODO: Maybe make a private class with LinkedHash/Tree Map + parcelable
      */
     LinkedHashMap<String, List<String>> answerMap;
+    public class StartSound extends TimerTask {
+    	@Override    	
+    	public void run(){    		
+    	MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.thin);
+    	mp.start();
+    	}
+    }
 	
     /** Called when the activity is first created. */
     @Override
@@ -130,12 +141,20 @@ public class XMLSurveyActivity extends Activity {
 			}
         });
         
+        
+        
         //Setup XML parser
 		XMLParser parser = new XMLParser();
 		
 		//Tell the parser which survey to use		
 		surveyName = getIntent().getStringExtra("survey_name");
 		surveyFile = getIntent().getStringExtra("survey_file");
+		if(surveyName.equalsIgnoreCase("RANDOM_ASSESSMENT") && surveyFile.equalsIgnoreCase("RandomAssessmentParcel.xml"))
+		{
+			Timer t=new Timer();
+			t.schedule(new  StartSound(),1000);
+			
+		}
 		
 		Log.d("XMLSurvey","File Name: "+surveyFile);
 		

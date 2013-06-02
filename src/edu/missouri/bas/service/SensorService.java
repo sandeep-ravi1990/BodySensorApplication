@@ -1,8 +1,13 @@
 package edu.missouri.bas.service;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -12,9 +17,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.TimeZone;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import org.apache.http.NameValuePair;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.message.BasicNameValuePair;
 
 import edu.missouri.bas.MainActivity;
@@ -28,6 +37,7 @@ import edu.missouri.bas.survey.XMLSurveyActivity;
 import edu.missouri.bas.survey.answer.SurveyAnswer;
 
 
+import android.R.string;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -42,6 +52,8 @@ import android.content.IntentFilter;
 import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -65,16 +77,26 @@ import com.equivital.sdk.decoder.events.SEMDateTimeDataEventArgs;
 import com.equivital.sdk.decoder.events.SemSummaryDataEventArgs;
 import com.equivital.sdk.decoder.events.SynchronisationTimerEventArgs;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
+
 
 
 public class SensorService extends Service  implements ISemDeviceTimingEvents, ISemDeviceSummaryEvents {
 
     private final String TAG = "SensorService";
-	
+    
+    
 	/*
 	 * Android component variables used by the service
 	 */
-	private Context serviceContext;
+	private static Context serviceContext;
 	private IBinder mBinder = new ServiceBinder<SensorService>(SensorService.this);
 
 	/*
@@ -95,7 +117,9 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	/*
 	 * File I/O Variables 
 	 */
-	private final String BASE_PATH = "sdcard/TestResults/";
+	public final static String BASE_PATH = "sdcard/TestResults/";
+	public String PATH_TOREAD;
+	//public static File BASE_PATH;
 	private final String[] surveyNames = {"CRAVING_EPISODE","DRINKING_FOLLOWUP",
 			"MORNING_REPORT","RANDOM_ASSESSMENT","MOOD_DYSREGULATION","INITIAL_DRINKING"};
 	private HashMap<String, String> surveyFiles;
@@ -165,10 +189,24 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	
 	public static final int CHEST_SENSOR_DATA = 109;
 	
+    public static final String START_HOUR = "START_HOUR";
+    
+    public static final String END_HOUR = "END_HOUR";
+    
+    public static final String START_MIN = "START_MIN";
+    
+    public static final String END_MIN = "END_MIN";
+    
+    static String errMSG ="Please check your wifi or dataplan.\r\nThe phone is offline now.";
 	
 	
 	
+	boolean mExternalStorageAvailable = false;
 	
+	boolean mExternalStorageWriteable = false;
+	
+	
+		
 	/*
 	 * Bluetooth Variables
 	 */
@@ -200,6 +238,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		return mBinder;
 	}
 	
+	@SuppressWarnings("deprecation")
 	@Override
 	public void onCreate(){
 		
@@ -258,6 +297,9 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		/*
 		 * Setup IO for recording
 		 */
+        
+       
+        
 		try {
 			prepareIO();
 		} catch (IOException e) {
@@ -286,6 +328,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		SensorService.this.registerReceiver(alarmReceiver, triggerFilter);*/
 		
 		Log.d(TAG,"Sensor service created.");
+	
 		
 		
 		httpPostRunnable = new HttpPostThread(this, "http://dslsrv8.cs.missouri.edu/BAS/InsertDebug.php");
@@ -308,6 +351,15 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		sdk.developerName = "Java Version";
 		sdk.licenseCode = "ZAP0Q9FLGo/XwrdBBAtdFk8jK7i/6fXFMzKiaCtC7jNvChtpMoOxSaH7tdqtFkmMbjUaskRyLGFCTGVJdNlrFjfbBjSGng9NGL4pnJ49TRTNR8Zmq0E9wnydpo3Du8RAcBVdGYjTjTctplrJ/cYHPHxOnbY5QuHYkY3dXBF3CSE=";
 		
+	    /*Code to check if external storage is available */
+	
+		
+		
+			
+	
+	
+	
+	
 	}
 	
 	
@@ -377,6 +429,41 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		
 		
 
+	}
+	
+	
+	
+	private class ScheduleSurvey extends TimerTask
+	{
+		int TriggerInterval;
+		public ScheduleSurvey(int Time)
+		{
+			TriggerInterval=Time;
+			
+		}
+
+				@Override
+		public void run() {
+					
+			// TODO Auto-generated method stub
+		  Random rand=new Random();
+		  int TriggerTime=rand.nextInt(TriggerInterval)+1;
+		 /* Calendar c=Calendar.getInstance();
+		  Date dtTrigger=new Date();
+		  dtTrigger.setMinutes(TriggerTime);
+		  c.setTimeInMillis(dtTrigger.getMinutes());*/
+		  Intent i = new Intent(serviceContext, XMLSurveyActivity.class);
+		  i.putExtra("survey_name", "RANDOM_ASSESSMENT");
+		  i.putExtra("survey_file", "RandomAssessmentParcel.xml");	
+		  PendingIntent surveyIntent = PendingIntent.getActivity(SensorService.this, 0,
+				                i, Intent.FLAG_ACTIVITY_NEW_TASK);
+		   mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+					SystemClock.elapsedRealtime()+1000*60*TriggerTime , surveyIntent);	   
+		   
+			
+		}
+		
+		
 	}
 	
 	/*
@@ -507,27 +594,51 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 					httpPostRunnable.post(new HttpPostRequest("", "LOCATION", pairs));
 				}
 			}
-			else if(action.equals(SensorService.ACTION_SCHEDULE_SURVEY)){
-				Log.d(TAG,"Received alarm event - schedule survey");
-				
-				String name = intent.getStringExtra(SurveyAnswer.TRIGGER_NAME);
-				String file = intent.getStringExtra(SurveyAnswer.TRIGGER_FILE);
-				Intent i = new Intent(serviceContext, XMLSurveyActivity.class);
-				i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				
-				if(name != null && file != null){
-					i.putExtra("survey_name",file);
-					i.putExtra("survey_file",name);
-				}
-				else{
-					long random = ((new Random(System.currentTimeMillis()).nextInt(60) ) + 60);
-					mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-							SystemClock.elapsedRealtime()+ (1000 * 60 * random) , scheduleSurvey);
-					i.putExtra("survey_name", "RANDOM_ASSESSMENT");
-					i.putExtra("survey_file", "RandomAssessmentParcel.xml");
-				}
-				serviceContext.startActivity(i);
+			else if(action.equals(SensorService.ACTION_SCHEDULE_SURVEY))
+			{
+							Log.d(TAG,"Received alarm event - schedule survey");								
+							int StartHour=intent.getIntExtra(START_HOUR,0);
+							int EndHour=intent.getIntExtra(END_HOUR,0);
+							int StartMin=intent.getIntExtra(START_MIN,0);
+							int EndMin=intent.getIntExtra(END_MIN,0);
+							int Interval=(((EndHour-StartHour)*60)+(EndMin-StartMin))/6;
+							int delay=Interval/2;
+							int Increment=Interval+delay;
+							int TriggerInterval=Interval-delay;
+							Log.d(TAG,String.valueOf(Interval));
+							Timer t1=new Timer();
+							Timer t2=new Timer();
+							Timer t3=new Timer();
+							Timer t4=new Timer();
+							Timer t5=new Timer();
+							Timer t6=new Timer();
+							Date dt1=new Date();				
+							dt1.setHours(StartHour);
+							dt1.setMinutes(StartMin);
+							Date dt2=new Date();
+							dt2.setHours(StartHour);
+							dt2.setMinutes(StartMin+Increment);				
+							Date dt3=new Date();
+							dt3.setHours(StartHour);
+							dt3.setMinutes(StartMin+Increment+Interval);
+							Date dt4=new Date();
+							dt4.setHours(StartHour);
+							dt4.setMinutes(StartMin+Increment+(Interval*2));
+							Date dt5=new Date();
+							dt5.setHours(StartHour);
+							dt5.setMinutes(StartMin+Increment+(Interval*3));
+							Date dt6=new Date();
+							dt6.setHours(StartHour);
+							dt6.setMinutes(StartMin+Increment+(Interval*4));				
+							
+							t1.schedule(new ScheduleSurvey(TriggerInterval),dt1);	
+							t2.schedule(new ScheduleSurvey(TriggerInterval),dt2);
+							t3.schedule(new ScheduleSurvey(TriggerInterval),dt3);
+							t4.schedule(new ScheduleSurvey(TriggerInterval),dt4);
+							t5.schedule(new ScheduleSurvey(TriggerInterval),dt5);
+							t6.schedule(new ScheduleSurvey(TriggerInterval),dt6);
 			}
+			
 			else if (action.equals(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS)){
 				Log.d(TAG,"Got survey results");
 				Calendar cal = Calendar.getInstance();
@@ -554,14 +665,22 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	};
 	
 	protected void writeLocationToFile(Location l){
+		
 		String toWrite;
-		File f = new File(BASE_PATH+"locations.txt");
-		toWrite = System.currentTimeMillis()+","+
+		Calendar cl=Calendar.getInstance();
+		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+		String dateObj =curFormater.format(cl.getTime());
+		File f = new File(BASE_PATH,"locations_"+dateObj+".txt");
+		
+		Calendar cal=Calendar.getInstance();
+		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
+		toWrite = String.valueOf(cal.getTime())+","+
 			l.getLatitude()+","+l.getLongitude()+","+
 			l.getAccuracy()+","+l.getProvider();
 		if(f != null){
 			try {
 				writeToFile(f, toWrite);
+				sendDatatoServer("locations_"+dateObj,toWrite);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -570,8 +689,10 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	
 	protected void writeSurveyToFile(String surveyName, 
 			HashMap<String, List<String>> surveyData, long time) throws IOException{
-		
-		File f = new File(surveyFiles.get(surveyName));
+		Calendar cl=Calendar.getInstance();
+		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+		String dateObj =curFormater.format(cl.getTime());
+		File f = new File(BASE_PATH,surveyName+"_"+dateObj+".txt");
 		Log.d(TAG,"File: "+f.getName());
 		
 		StringBuilder sb = new StringBuilder(100);
@@ -601,6 +722,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		}
 
 		sb.append("\n");
+		sendDatatoServer(surveyName+"_"+dateObj,sb.toString());
 		writeToFile(f,sb.toString());
 	}
 	
@@ -611,13 +733,10 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		fw.close();
 	}
 	
-	/*protected void writeDataToFile(File f, String toWrite) throws IOException{
-		FileWriter fw = new FileWriter(f, true);
-		fw.append(toWrite);
-	    fw.append('\n');
-        fw.flush();
-		fw.close();
-	}*/
+	
+	
+	
+	
 	
 	protected List<NameValuePair> parseMapToList(HashMap<String, List<String>> map){
 		Calendar cal = Calendar.getInstance();
@@ -640,6 +759,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		result.add(new BasicNameValuePair("timestamp",cal.getTime().toString()));
 		result.add(new BasicNameValuePair("userid",bluetoothMacAddress));
 		return result;
+		
 	}
 	
 	protected List<NameValuePair> parseAssocToList(HashMap<String, String> map){
@@ -661,6 +781,8 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		result.add(new BasicNameValuePair("userid",bluetoothMacAddress));		
 		return result;
 	}
+
+//------------------------------------------Wrist Sensor Code Starts From Here ------------------------------------------------------
 
 	BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
 		@Override
@@ -793,7 +915,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 				switch(newState) {
 					case BluetoothRunnable.BluetoothState.CONNECTED:
 						newStateString = "Connected to: "+deviceName;	
-						Intent h=new Intent("fucku");
+						Intent h=new Intent("statechange");
 						h.putExtra("State_Change",newStateString);
 						serviceContext.sendBroadcast(h);
 						break;
@@ -844,6 +966,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 
 		
 		private void handleBluetoothStateChange(String deviceAddress, String deviceName, String newState){
+			
 			if(affectivaRunnable != null)
 			{
 				Intent i = new Intent(ACTION_BLUETOOTH_STATE_RESULT);
@@ -864,7 +987,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		}
 	};
 	
-	/*Chest Sensor Code Starts From Here */
+//------------------------------------------Chest Sensor Code Starts From Here ------------------------------------------------------
 	
 	BroadcastReceiver chestSensorReceiver = new BroadcastReceiver() {
 		@Override
@@ -950,20 +1073,96 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		//Toast.makeText(serviceContext,"Trying to write to the file",Toast.LENGTH_LONG).show();
 		Calendar c=Calendar.getInstance();
 		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
-		String dateObj =curFormater.format(c.getTime()); 
-		String file_name="chestsensor"+dateObj+".txt";
-		Toast.makeText(serviceContext,file_name,Toast.LENGTH_LONG).show();		
+		String dateObj =curFormater.format(c.getTime()); 		
+		String file_name="chestsensor_"+dateObj+".txt";
+		
+		
+		Calendar cal=Calendar.getInstance();
+		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
+		
         File f = new File(BASE_PATH,file_name);		
-		String dataToWrite = System.currentTimeMillis()+","+chestSensorData;
+		String dataToWrite = String.valueOf(cal.getTime())+","+chestSensorData;
+		sendDatatoServer("chestsensor_"+dateObj,dataToWrite);
 		if(f != null){
 			try {
 				writeToFile(f, dataToWrite);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+					
+			
 		}	
+		
+		
+		
+	}
+	
+	@Override
+	public void synchronisationTimerDataReceived(SemDevice arg0,
+			SynchronisationTimerEventArgs arg1) {
+		// TODO Auto-generated method stub
+		
 	}
 
+//---------------------------------------Code to upload data to the server----------------------------------------------//
+	
+	public static void sendDatatoServer(String FileName,String DataToSend)
+	{
+		if (checkDataConnectivity())
+    	{
+
+        HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/writeStrToFile.php");
+        List<NameValuePair> params = new ArrayList<NameValuePair>();
+        //file_name 
+        params.add(new BasicNameValuePair("file_name",FileName));
+        //data
+        params.add(new BasicNameValuePair("data",DataToSend+"\n"));
+
+        
+        try {
+            request.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
+            HttpResponse response = new DefaultHttpClient().execute(request);
+            if(response.getStatusLine().getStatusCode() == 200){
+                String result = EntityUtils.toString(response.getEntity());
+                Toast.makeText(serviceContext,"Data Point Successfully Uploaded", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            
+           Toast.makeText(serviceContext,"Error during HTTP POST REQUEST",Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        }
+    	}
+    	else Toast.makeText(serviceContext, errMSG, Toast.LENGTH_LONG).show();
+    }
+		
+	
+	 public Handler mDataHandler=new Handler(){
+
+		@Override
+		public void handleMessage(Message msg) {
+			// TODO Auto-generated method stub
+			super.handleMessage(msg);
+			if(msg.what==101)
+			{
+				String rawdata=msg.obj.toString();
+				String [] strData=rawdata.split(",");
+				String file_name=strData[0];
+				String data=strData[1];
+				sendDatatoServer(file_name,data);
+				
+			}
+			
+			
+		}
+		
+		
+		
+		
+	};
+	
+	
+
+	
 	@Override
 	public void semDateTimeDataReceived(SemDevice arg0,
 			SEMDateTimeDataEventArgs arg1) {
@@ -971,10 +1170,22 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		
 	}
 
-	@Override
-	public void synchronisationTimerDataReceived(SemDevice arg0,
-			SynchronisationTimerEventArgs arg1) {
-		// TODO Auto-generated method stub
-		
-	}
+	
+	 public static boolean checkDataConnectivity() {
+	    	ConnectivityManager connectivity = (ConnectivityManager) serviceContext
+					.getSystemService(Context.CONNECTIVITY_SERVICE);
+			if (connectivity != null) {
+				NetworkInfo[] info = connectivity.getAllNetworkInfo();
+				if (info != null) {
+					for (int i = 0; i < info.length; i++) {
+						if (info[i].getState() == NetworkInfo.State.CONNECTED) {
+							return true;
+						}
+					}
+				}
+			}
+			return false;
+		}
+	 
+	
 }

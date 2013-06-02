@@ -1,10 +1,21 @@
 package edu.missouri.bas;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 import android.app.Activity;
 import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.StrictMode;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -19,6 +30,31 @@ import edu.missouri.bas.activities.DeviceListActivity;
 import edu.missouri.bas.bluetooth.BluetoothRunnable;
 import edu.missouri.bas.service.SensorService;
 import edu.missouri.bas.survey.XMLSurveyMenu;
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
+
+
+
+
+import android.app.Activity;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Bundle;
+import android.os.Environment;
+import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 public class MainActivity extends ListActivity {
 
@@ -35,11 +71,42 @@ public class MainActivity extends ListActivity {
 	protected static final int SURVEY = 2;	
 	protected static final int CONNECTIONS = 3;
 	public  final MainActivity thisActivity = this;
+	private final static String urlServer = "http://babbage.cs.missouri.edu/~rs79c/Android/upload.php";
+	HttpURLConnection connection = null;
+	DataOutputStream outputStream = null;
+	DataInputStream inputStream = null;
+	
+	Calendar cl=Calendar.getInstance();
+	SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+	String dateObj =curFormater.format(cl.getTime());
+	File path1 = new File(Environment.getExternalStorageDirectory(), "TestResults/chestsensor_"+dateObj+".txt");
+
+	String chestsensorFilePath = path1.getAbsolutePath();
+	
+	
+	
+	String lineEnd = "\r\n";
+	String twoHyphens = "--";
+	String boundary =  "*****";
+	
+
+	String errMSG ="Please check your wifi or dataplan.\r\nThe phone is offline now.";
+
+	int bytesRead, bytesAvailable, bufferSize;
+	byte[] buffer;
+	int maxBufferSize = 1*1024*1024;
+	
+	
+
+	//action URL
+	
 	
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         //setContentView(R.layout.activity_main);
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
        
         
     	String[] options = {"Start Service", "Stop Service", "Survey Menu",
@@ -61,15 +128,20 @@ public class MainActivity extends ListActivity {
 	    			break;
 	    		case STOP:
 	    			stopSService();
+	    			uploadFiles(urlServer,chestsensorFilePath);
+	    			
+	    			//Toast.makeText(getApplicationContext(), "Successfully uploaded files.", Toast.LENGTH_LONG).show();
 	    			break;
 	    		case SURVEY: 
 	    			startSurveyMenu();
 	    			break;	    		
 	    		case CONNECTIONS:
-	    			startConnections();
+	    			startConnections();	    			
 	    			break;
 		    	}
 			}
+
+			
         	
         });
 
@@ -93,6 +165,80 @@ public class MainActivity extends ListActivity {
         
     }
     
+    
+    private void uploadFiles(String urlServer,String Path) {
+		// TODO Auto-generated method stub
+    	
+    	
+    	try
+    	{
+    	FileInputStream fileInputStream = new FileInputStream(new File(Path) );
+    	
+    	URL url = new URL(urlServer);
+    	connection = (HttpURLConnection) url.openConnection();
+    	
+    	// Allow Inputs & Outputs
+    	connection.setDoInput(true);
+    	connection.setDoOutput(true);
+    	connection.setUseCaches(false);
+    	
+    	// Enable POST method
+    	connection.setRequestMethod("POST");
+    	
+    	connection.setRequestProperty("Connection", "Keep-Alive");
+    	connection.setRequestProperty("Content-Type", "multipart/form-data;boundary="+boundary);
+    	
+    	outputStream = new DataOutputStream( connection.getOutputStream() );
+    	outputStream.writeBytes(twoHyphens + boundary + lineEnd);
+    	outputStream.writeBytes("Content-Disposition: form-data; name=\"uploadedfile\";filename=\"" + Path +"\"" + lineEnd);
+    	outputStream.writeBytes(lineEnd);
+    	
+    	bytesAvailable = fileInputStream.available();
+    	bufferSize = Math.min(bytesAvailable, maxBufferSize);
+    	buffer = new byte[bufferSize];
+    	
+    	// Read file
+    	bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+    	
+    	while (bytesRead > 0)
+    	{
+    	outputStream.write(buffer, 0, bufferSize);
+    	bytesAvailable = fileInputStream.available();
+    	bufferSize = Math.min(bytesAvailable, maxBufferSize);
+    	bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+    	}
+    	
+    	outputStream.writeBytes(lineEnd);
+    	outputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
+    	
+    	// Responses from the server (code and message)
+    	/*
+    	int serverResponseCode = connection.getResponseCode();
+    	String serverResponseMessage = connection.getResponseMessage();
+    	*/
+    	
+    	fileInputStream.close();
+    	outputStream.flush();
+    	
+    	InputStream is = connection.getInputStream();
+        InputStreamReader isr = new InputStreamReader(is, "utf-8");
+        BufferedReader br = new BufferedReader(isr);
+        String result = br.readLine();
+
+        Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+        
+    	outputStream.close();
+    	is.close();
+    	}
+    	catch (Exception e)
+    	{
+    	//Exception handling
+    	e.printStackTrace();
+    	setTitle(e.getMessage());
+    	}
+    	   	
+    	
+	}
     private void startSurveyMenu(){
 		Intent i = new Intent(getApplicationContext(), XMLSurveyMenu.class);
 		startActivity(i);
