@@ -96,7 +96,7 @@ public class XMLSurveyActivity extends Activity {
     public class StartSound extends TimerTask {
     	@Override    	
     	public void run(){    		
-    	MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.thin);
+    	MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.bodysensor_alarm);
     	mp.start();
     	}
     }
@@ -152,7 +152,7 @@ public class XMLSurveyActivity extends Activity {
 		if(surveyName.equalsIgnoreCase("RANDOM_ASSESSMENT") && surveyFile.equalsIgnoreCase("RandomAssessmentParcel.xml"))
 		{
 			Timer t=new Timer();
-			t.schedule(new  StartSound(),1000);
+			t.schedule(new  StartSound(),1000*10);
 			
 		}
 		

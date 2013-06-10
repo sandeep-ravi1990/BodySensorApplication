@@ -28,6 +28,7 @@ import org.apache.http.message.BasicNameValuePair;
 
 import edu.missouri.bas.MainActivity;
 import edu.missouri.bas.R;
+import edu.missouri.bas.SurveyStatus;
 import edu.missouri.bas.bluetooth.BluetoothRunnable;
 import edu.missouri.bas.bluetooth.affectiva.AffectivaPacket;
 import edu.missouri.bas.bluetooth.affectiva.AffectivaRunnable;
@@ -64,6 +65,8 @@ import android.os.PowerManager.WakeLock;
 import android.os.SystemClock;
 import android.os.Vibrator;
 import android.util.Log;
+import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.equivital.sdk.ISemConnection;
@@ -135,6 +138,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 	private PendingIntent scheduleSurvey;
 	private PendingIntent scheduleSensor;
 	private PendingIntent scheduleLocation;
+	//private PendingIntent surveyIntent;
 
 	/*
 	 * Static intent actions
@@ -199,12 +203,18 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
     
     static String errMSG ="Please check your wifi or dataplan.\r\nThe phone is offline now.";
 	
-	
+    static boolean IsScheduled = false;	
 	
 	boolean mExternalStorageAvailable = false;
 	
 	boolean mExternalStorageWriteable = false;
 	
+	public static Timer t1=new Timer();
+	public static Timer t2=new Timer();
+	public static Timer t3=new Timer();
+	public static Timer t4=new Timer();
+	public static Timer t5=new Timer();
+	public static Timer t6=new Timer();
 	
 		
 	/*
@@ -457,7 +467,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		  i.putExtra("survey_file", "RandomAssessmentParcel.xml");	
 		  PendingIntent surveyIntent = PendingIntent.getActivity(SensorService.this, 0,
 				                i, Intent.FLAG_ACTIVITY_NEW_TASK);
-		   mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+		  mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
 					SystemClock.elapsedRealtime()+1000*60*TriggerTime , surveyIntent);	   
 		   
 			
@@ -535,8 +545,11 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		mAlarmManager.cancel(scheduleSurvey);
 		mAlarmManager.cancel(scheduleSensor);
 		mAlarmManager.cancel(scheduleLocation);
+		//mAlarmManager.cancel(surveyIntent);
 		
 		serviceWakeLock.release();
+		CancelTimers();
+		setStatus(false);
 		
 		Log.d(TAG,"Service Stopped.");
 		
@@ -545,6 +558,8 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		device.stop();
 		}
 	}
+	
+	
 	
 	BroadcastReceiver alarmReceiver = new BroadcastReceiver() {
 		@Override
@@ -606,15 +621,10 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 							int Increment=Interval+delay;
 							int TriggerInterval=Interval-delay;
 							Log.d(TAG,String.valueOf(Interval));
-							Timer t1=new Timer();
-							Timer t2=new Timer();
-							Timer t3=new Timer();
-							Timer t4=new Timer();
-							Timer t5=new Timer();
-							Timer t6=new Timer();
+							
 							Date dt1=new Date();				
 							dt1.setHours(StartHour);
-							dt1.setMinutes(StartMin);
+							dt1.setMinutes(StartMin+delay);
 							Date dt2=new Date();
 							dt2.setHours(StartHour);
 							dt2.setMinutes(StartMin+Increment);				
@@ -629,14 +639,18 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 							dt5.setMinutes(StartMin+Increment+(Interval*3));
 							Date dt6=new Date();
 							dt6.setHours(StartHour);
-							dt6.setMinutes(StartMin+Increment+(Interval*4));				
-							
+							dt6.setMinutes(StartMin+Increment+(Interval*4));
 							t1.schedule(new ScheduleSurvey(TriggerInterval),dt1);	
 							t2.schedule(new ScheduleSurvey(TriggerInterval),dt2);
 							t3.schedule(new ScheduleSurvey(TriggerInterval),dt3);
 							t4.schedule(new ScheduleSurvey(TriggerInterval),dt4);
 							t5.schedule(new ScheduleSurvey(TriggerInterval),dt5);
 							t6.schedule(new ScheduleSurvey(TriggerInterval),dt6);
+							setStatus(true);
+							
+							
+							
+							
 			}
 			
 			else if (action.equals(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS)){
@@ -664,6 +678,37 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 		}
 	};
 	
+	public static void CancelTimers()
+	{
+		t1.cancel();
+		t1.purge();
+		t2.cancel();
+		t2.purge();
+		t3.cancel();
+		t3.purge();
+		t4.cancel();
+		t4.purge();
+		t5.cancel();
+		t5.purge();
+		t6.cancel();
+		t6.purge();		
+		
+	}
+	
+	
+	public static void setStatus(boolean value)
+	{
+		IsScheduled = value;
+		
+	}
+	
+	
+	public static boolean getStatus()
+	{
+		
+		return IsScheduled;
+	}
+	
 	protected void writeLocationToFile(Location l){
 		
 		String toWrite;
@@ -686,6 +731,8 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 			}
 		}		
 	}
+	
+	
 	
 	protected void writeSurveyToFile(String surveyName, 
 			HashMap<String, List<String>> surveyData, long time) throws IOException{
@@ -711,11 +758,11 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
 			List<String> data = surveyData.get(key);
 			sb.append(key+":");
 			if(data == null)
-				sb.append("");
+				sb.append("-1");
 			else{
 				for(int j = 0; j < data.size(); j++){
 					sb.append(data.get(j));
-					if(i != data.size()-1)sb.append(";");
+					if(i != data.size()-1)sb.append("");
 				}
 			}
 			if(i != sorted.size()-1) sb.append(",");
@@ -1124,7 +1171,7 @@ public class SensorService extends Service  implements ISemDeviceTimingEvents, I
             HttpResponse response = new DefaultHttpClient().execute(request);
             if(response.getStatusLine().getStatusCode() == 200){
                 String result = EntityUtils.toString(response.getEntity());
-                Toast.makeText(serviceContext,"Data Point Successfully Uploaded", Toast.LENGTH_LONG).show();
+                //Toast.makeText(serviceContext,"Data Point Successfully Uploaded", Toast.LENGTH_LONG).show();
             }
         } catch (Exception e) {
             

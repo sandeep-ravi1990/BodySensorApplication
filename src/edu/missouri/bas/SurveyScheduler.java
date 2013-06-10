@@ -11,6 +11,7 @@ import java.util.TimerTask;
 import edu.missouri.bas.service.SensorService;
 
 import android.os.Bundle;
+import android.os.Message;
 import android.app.Activity;
 import android.app.TimePickerDialog;
 import android.content.Intent;
@@ -48,7 +49,6 @@ public class SurveyScheduler extends Activity {
 		StartMinutes=CurrentMinutes;
 		EndHours=CurrentHours;
 		EndMinutes=CurrentMinutes;
-		startSService();
 		
 		  tpStartTime.setOnTimeChangedListener(new TimePicker.OnTimeChangedListener() {
 			
@@ -134,8 +134,8 @@ public class SurveyScheduler extends Activity {
 					    		startScheduler.putExtra(SensorService.START_MIN,Minutes);					    		
 					    		startScheduler.putExtra(SensorService.END_MIN,EndMinutes);
 								getApplicationContext().sendBroadcast(startScheduler);
-								Toast.makeText(getApplicationContext(),"Message sent to the service",Toast.LENGTH_LONG).show();
-								Intent i=new Intent(getApplicationContext(), MainActivity.class);
+								Toast.makeText(getApplicationContext(),"Message sent to the service",Toast.LENGTH_LONG).show();								
+								Intent i=new Intent(getApplicationContext(), SurveyStatus.class);
 								startActivity(i);
 					    		
 					    		
@@ -145,7 +145,7 @@ public class SurveyScheduler extends Activity {
 			    	
 			   else {
 				   
-				   Intent startScheduler = new Intent(SensorService.ACTION_SCHEDULE_SURVEY);	
+				    Intent startScheduler = new Intent(SensorService.ACTION_SCHEDULE_SURVEY);	
 		    		int Hours=StartTime.getHours();
 		    		int Minutes=StartTime.getMinutes();
 		    		int EndHours=EndTime.getHours();
@@ -154,9 +154,9 @@ public class SurveyScheduler extends Activity {
 		    		startScheduler.putExtra(SensorService.END_HOUR,EndHours);
 		    		startScheduler.putExtra(SensorService.START_MIN,Minutes);					    		
 		    		startScheduler.putExtra(SensorService.END_MIN,EndMinutes);
-					getApplicationContext().sendBroadcast(startScheduler);
-					Toast.makeText(getApplicationContext(),"Message sent to the service",Toast.LENGTH_LONG).show();
-					Intent i=new Intent(getApplicationContext(), MainActivity.class);
+		    		getApplicationContext().sendBroadcast(startScheduler);
+					Toast.makeText(getApplicationContext(),"Message sent to the service",Toast.LENGTH_LONG).show();					
+					Intent i=new Intent(getApplicationContext(), SurveyStatus.class);
 					startActivity(i);
 			   }			     	
 			 
@@ -165,14 +165,7 @@ public class SurveyScheduler extends Activity {
 		
 	}
 	
-	 private void startSService() {
-	        if (! mIsRunning) {
-	            mIsRunning = true;            
-		         this.startService(new Intent(SurveyScheduler.this,SensorService.class));
-		            
-	            
-	        }
-	    }
+
 
 	
 	

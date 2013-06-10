@@ -70,6 +70,7 @@ public class MainActivity extends ListActivity {
 	protected static final int STOP = 1;
 	protected static final int SURVEY = 2;	
 	protected static final int CONNECTIONS = 3;
+	protected static final int SURVEY_STATUS = 4;
 	public  final MainActivity thisActivity = this;
 	private final static String urlServer = "http://babbage.cs.missouri.edu/~rs79c/Android/upload.php";
 	HttpURLConnection connection = null;
@@ -110,7 +111,7 @@ public class MainActivity extends ListActivity {
        
         
     	String[] options = {"Start Service", "Stop Service", "Survey Menu",
-		"External Sensor Connections"};
+		"External Sensor Connections","Schedule Survey Activity"};
     	
     	ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
     			android.R.layout.simple_list_item_1, options);
@@ -128,8 +129,7 @@ public class MainActivity extends ListActivity {
 	    			break;
 	    		case STOP:
 	    			stopSService();
-	    			uploadFiles(urlServer,chestsensorFilePath);
-	    			
+	    			//uploadFiles(urlServer,chestsensorFilePath);	    			
 	    			//Toast.makeText(getApplicationContext(), "Successfully uploaded files.", Toast.LENGTH_LONG).show();
 	    			break;
 	    		case SURVEY: 
@@ -138,8 +138,13 @@ public class MainActivity extends ListActivity {
 	    		case CONNECTIONS:
 	    			startConnections();	    			
 	    			break;
+	    		case SURVEY_STATUS:
+	    			startSurveyScheduler();	    			
+	    			break;
 		    	}
 			}
+
+			
 
 			
         	
@@ -244,6 +249,11 @@ public class MainActivity extends ListActivity {
 		startActivity(i);
     }
     
+    private void startSurveyScheduler() {
+		// TODO Auto-generated method stub
+    	Intent i = new Intent(getApplicationContext(), SurveyStatus.class);
+		startActivity(i);
+	}
     private void startConnections(){
 		Intent i = new Intent(getApplicationContext(), SensorConnections.class);
 		startActivity(i);

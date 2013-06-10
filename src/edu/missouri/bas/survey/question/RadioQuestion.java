@@ -52,6 +52,7 @@ public class RadioQuestion extends Question {
 			RadioButton temp = new RadioButton(c);
 			temp.setText(ans.getValue());
 			temp.setTextSize(TypedValue.COMPLEX_UNIT_DIP,18);
+			ans.checkClear();
 			
 			radioGroup.addView(temp);
 			
@@ -62,6 +63,7 @@ public class RadioQuestion extends Question {
 
 			answerViews.put(temp, ans);
 			
+			
 			temp.setOnCheckedChangeListener(new OnCheckedChangeListener(){
 				
 				public void onCheckedChanged(CompoundButton buttonView,
@@ -69,7 +71,7 @@ public class RadioQuestion extends Question {
 					if(isChecked){
 						if(selectedAnswer != null) selectedAnswer.setSelected(false);
 						SurveyAnswer selected = answerViews.get(buttonView);
-						selected.setSelected(true);
+						//selected.setSelected(true);
 						selectedAnswer = selected;
 						skipTo = selected.getSkip();
 						answered = true;
