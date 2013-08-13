@@ -1,7 +1,7 @@
 <root>
 	<category>    
 		<description>MOOD change</description>
-		<question id="q11" type = "radio">
+		<question id="q311" type = "radio">
 			<text>How much did your mood change?</text>
 			<answer id = "1">1 - Very Slightly or Not At All</answer>
 			<answer id = "2">2 - A little</answer>
@@ -9,12 +9,12 @@
 			<answer id = "4">4 - Quite a bit</answer>
 			<answer id = "5">5 - Extremely</answer>
 		</question>
-		<question id="q12" type = "radio">
+		<question id="q312" type = "radio">
 			<text>Are you in a better or worse mood now than before?</text>
-			<answer id="a12y">better</answer>
-			<answer id="a12n">worse</answer>
+			<answer id="y">better</answer>
+			<answer id="n">worse</answer>
 		</question>
-		<question id= "q13" type = "check">
+		<question id= "q313" type = "check">
 			<text> if worse, WHAT TRIGGERED your mood change? (check all that apply)</text>
 			<answer id = "a131">lack of sleep</answer>
 			<answer id = "a132">argument or conflict</answer>
@@ -30,7 +30,7 @@
 		</question>	
 	</category>
 	
-	<externalsource baseid="q2" filename="MoodSubset.xml"></externalsource>
+	<externalsource baseid="q32" filename="MoodSubset.xml"></externalsource>
 	
 	<category>
 	    <description>Alcohol Urge/Craving</description>
@@ -40,10 +40,10 @@
 			<answer id = "3">3 - Somewhat</answer>
 			<answer id = "4">4 - Quite a bit</answer>
 			<answer id = "5">5 - Extremely</answer>
-			<text id="q31">Do you CRAVE A DRINK right now?</text>
-			<text id="q32">Do you CRAVE A CIGARETTE right now?</text>
+			<text id="q331">Do you CRAVE A DRINK right now?</text>
+			<text id="q332">Do you CRAVE A CIGARETTE right now?</text>
 		</questionblock>
 	</category>
 	
-	<externalsource baseid="q4" filename="SituationAndSetting.xml"></externalsource>	
+	<externalsource baseid="q34" filename="SituationAndSetting.xml"></externalsource>	
 </root>

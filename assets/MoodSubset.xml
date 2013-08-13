@@ -1,5 +1,5 @@
 <root>
-	<category type = "random">		
+	<category>		
 		<description>Mood and Impulsivity Items</description>
 		<questionblock type="radio">
 			<answer id = "1">1 - Very Slightly or Not At All</answer>
@@ -37,10 +37,10 @@
 			<text id="28">How much have you felt the following IN THE PAST 15 MINUTES? INTERESTED</text>
 			<text id="29">How much have you felt the following IN THE PAST 15 MINUTES? PROUD</text>
 			<text id="30">How much have you felt the following IN THE PAST 15 MINUTES? STRONG</text>
-			<text id="31">How much have you felt the following IN THE PAST 15 MINUTES? HAPPY</text>
+			<text id="31">How much have you felt the following IN THE PAST 15 MINUTES? GUILTY</text>
 			<text id="32">How well does this describe you OVER THE LAST 15 MINUTES? I felt and acted on a strong impulse</text>
 			<text id="33">How well does this describe you OVER THE LAST 15 MINUTES? I did something without really thinking it through</text>
-			<text id="34">How well does this describe you OVER THE LAST 15 MINUTES? I did something for the thrill of it</text>			
+			<text id="34">How well does this describe you OVER THE LAST 15 MINUTES? I gave up easily and I did something for the thrill of it</text>			
 		</questionblock>
 	</category>
 </root>

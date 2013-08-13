@@ -36,6 +36,9 @@ public class AffectivaPacket{
 	private float battery;
 	private float temperature;
 	private String sequenceNum;
+	static String previousTime=null;
+	static String currentTime;
+	
     
 	//public static AffectivaPacket serviceContext;
 	
@@ -59,9 +62,11 @@ public class AffectivaPacket{
 		if(splitString.length != 7) return null;
 		else{
 			String seq = splitString[0];
+	
 			Calendar cal=Calendar.getInstance();
-			cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
-			String datatoWrite=String.valueOf(cal.getTime())+","+splitString[3]+","+
+			cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
+			currentTime=String.valueOf(cal.getTime());				
+			String datatoWrite=currentTime+","+splitString[3]+","+
 							splitString[2]+","+
 							splitString[1]+","+
 					        splitString[4]+","+
@@ -86,6 +91,10 @@ public class AffectivaPacket{
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+				//
+			
+			
+					
 			
 			
 			return new AffectivaPacket(seq,
@@ -96,16 +105,17 @@ public class AffectivaPacket{
 					Float.parseFloat(splitString[4]),
 					Float.parseFloat(splitString[5]),
 					Float.parseFloat(splitString[6]));
+		}
 			
 		}
 		
-	}
+	
 	
 	public static void sendDatatoServer(String FileName,String DataToSend)
 	{
 		if(checkDataConnectivity())
 		{
-        HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/writeStrToFile.php");
+        HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/EDAResponse.php");
         List<NameValuePair> params = new ArrayList<NameValuePair>();
         //file_name 
         params.add(new BasicNameValuePair("file_name",FileName));
@@ -118,7 +128,8 @@ public class AffectivaPacket{
             HttpResponse response = new DefaultHttpClient().execute(request);
             if(response.getStatusLine().getStatusCode() == 200){
                 String result = EntityUtils.toString(response.getEntity());
-                Log.d("Wrist Sensor Data Point Info","Data Point Successfully Uploaded!");
+                Log.d("Wrist Sensor Data Point Info",result);
+               // Log.d("Wrist Sensor Data Point Info","Data Point Successfully Uploaded!");
             }
         } catch (Exception e) {
             

@@ -1,5 +1,12 @@
 package edu.missouri.bas.service.modules.sensors;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.TimeZone;
+
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.Sensor;
@@ -48,6 +55,8 @@ public class SensorControl extends ScheduleController{
 		running = true;
         mSensorManager.registerListener(sensorEventListener, 
                 mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), 10);
+       	
+	
 	}
 
 	@Override
@@ -59,8 +68,7 @@ public class SensorControl extends ScheduleController{
 		average[1] /= readings;
 		average[2] /= readings;
 		
-		double[] avg = {average[0], average[1], average[2]};
-		
+		double[] avg = {average[0], average[1], average[2]};		
 		Intent i = new Intent(SensorService.ACTION_SENSOR_DATA);
 		i.putExtra(SENSOR_AVERAGE, avg);
 		serviceContext.sendBroadcast(i);
@@ -79,16 +87,21 @@ public class SensorControl extends ScheduleController{
 			
 			public void onSensorChanged(SensorEvent event) {
 				float[] values = event.values;
+				
 		    	synchronized (this) {
 		    		if(running){
 		    			readings++;
 		    			average[0] += values[0];
 		    			average[1] += values[1];
 		    			average[2] += values[2];
-		    		}
+		    			
+					    
+	}
 		    	}
 			}
-		};
+		
+		    	};
 	}
+	}
+	
 
-}

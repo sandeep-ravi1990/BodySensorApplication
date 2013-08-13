@@ -152,7 +152,7 @@ public class XMLSurveyActivity extends Activity {
 		if(surveyName.equalsIgnoreCase("RANDOM_ASSESSMENT") && surveyFile.equalsIgnoreCase("RandomAssessmentParcel.xml"))
 		{
 			Timer t=new Timer();
-			t.schedule(new  StartSound(),1000*10);
+			t.schedule(new  StartSound(),1000*5);
 			
 		}
 		

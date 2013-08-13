@@ -16,6 +16,8 @@ import edu.missouri.bas.survey.category.Category;
 import edu.missouri.bas.survey.category.RandomCategory;
 import edu.missouri.bas.survey.category.SurveyCategory;
 import edu.missouri.bas.survey.question.CheckQuestion;
+import edu.missouri.bas.survey.question.CoffeeQuestion;
+import edu.missouri.bas.survey.question.HourQuestion;
 import edu.missouri.bas.survey.question.NumberQuestion;
 import edu.missouri.bas.survey.question.QuestionType;
 import edu.missouri.bas.survey.question.RadioInputQuestion;
@@ -194,6 +196,12 @@ public class XMLHandler extends DefaultHandler {
 			}
 			else if(s.equals("number")){
 				question = new NumberQuestion(id);
+			}
+			else if(s.equals("hour")){
+				question = new HourQuestion(id);
+			}
+			else if(s.equals("coffee")){
+				question = new CoffeeQuestion(id);
 			}
 			else if(s.equals("text")){
 				question = new TextQuestion(id);

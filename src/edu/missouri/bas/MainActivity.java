@@ -29,6 +29,8 @@ import android.widget.Toast;
 import edu.missouri.bas.activities.DeviceListActivity;
 import edu.missouri.bas.bluetooth.BluetoothRunnable;
 import edu.missouri.bas.service.SensorService;
+import edu.missouri.bas.service.modules.location.ActivityRecognitionScan;
+
 import edu.missouri.bas.survey.XMLSurveyMenu;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -260,7 +262,7 @@ public class MainActivity extends ListActivity {
     }
     
     private void stopSService() {
-    	mIsRunning = false;    	
+    	mIsRunning = false; 
     	this.stopService(new Intent(MainActivity.this,SensorService.class));
     	 
     }
@@ -268,8 +270,9 @@ public class MainActivity extends ListActivity {
         if (! mIsRunning) {
             mIsRunning = true;            
 	         this.startService(new Intent(MainActivity.this,SensorService.class));
-	            
-            
+	       /*//Start Activity Recognition Service
+	        ActivityRecognitionScan activityScan=new ActivityRecognitionScan(getApplicationContext());
+	 		activityScan.startActivityRecognitionScan();*/
         }
     }
     
