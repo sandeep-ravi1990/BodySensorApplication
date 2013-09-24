@@ -31,14 +31,6 @@ protected void onHandleIntent(Intent intent) {
       }
 }
 
-
-/*protected void writeToFile(File f, String toWrite) throws IOException{
-	FileWriter fw = new FileWriter(f, true);
-	fw.write(toWrite+'\n');		
-    fw.flush();
-	fw.close();
-}*/
-
 /**
 * When supplied with the integer representation of the activity returns the activity as friendly string
 * @param type the DetectedActivity.getType()

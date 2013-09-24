@@ -3,20 +3,38 @@ package com.equivital.sdk.connection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 import java.util.Vector;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.MediaPlayer;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.os.SystemClock;
+import android.os.Vibrator;
+import android.util.Log;
 
 import com.equivital.sdk.ISemConnection;
 import com.equivital.sdk.ISemConnectionEvents;
 import com.equivital.sdk.ISemConnectionManager;
 import com.equivital.sdk.SemDataReceivedEventArgs;
 
+import edu.missouri.bas.MainActivity;
+import edu.missouri.bas.R;
 import edu.missouri.bas.SensorConnections;
+import edu.missouri.bas.service.SensorService;
+import edu.missouri.bas.survey.XMLSurveyActivity.StartSound;
 
 /**
  * Implementation of the Equivital ISemConnection interface for the Android Bluetooth Stack 
@@ -26,6 +44,7 @@ public class SemBluetoothConnection implements ISemConnection
 {
     // Unique UUID for this application
     private static final UUID SERIAL_PROFILE_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    public static String equivitalAddress;
 
     // Member fields
     private final BluetoothAdapter mBluetoothAdapter;
@@ -38,15 +57,23 @@ public class SemBluetoothConnection implements ISemConnection
 	private Vector<ISemBluetoothConnectionEvents> _eventHandlersBT = new Vector<ISemBluetoothConnectionEvents>();
 	private String _portAddress = "";
 	private SemDataReceivedEventArgs _args = new SemDataReceivedEventArgs();
-	protected Handler sensorHandler;
+	protected static Handler sensorHandler;
 
     // Constants that indicate the current connection state
     public static final int STATE_NONE = 0;       // we're doing nothing
     public static final int STATE_LISTEN = 1;     // now listening for incoming connections
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
-
-
+    public static final int STATE_RECONNECTING = 4;
+    public boolean isAttemptSuccessful=true;
+    public static int Count=0;
+    public static int Count1=0;
+    static Timer timer1;
+    PendingIntent startReconnection;
+    boolean IsScheduled=false;
+    IntentFilter reconnectionRequest = new IntentFilter(SensorService.ACTION_RECONNECT_CHESTSENSOR);
+    
+    IntentFilter startRequest=new IntentFilter(SensorService.ACTION_START_RECONNECTING);
 
 	/**
 	 * Adds an event listener
@@ -146,8 +173,9 @@ public class SemBluetoothConnection implements ISemConnection
 	 */
 	public static ISemConnection createConnection(String deviceAddress)
 	{
-		return new SemBluetoothConnection(deviceAddress);
+		equivitalAddress=deviceAddress;		
 		
+		return new SemBluetoothConnection(deviceAddress);		
 	}
 	
 	/**
@@ -161,6 +189,11 @@ public class SemBluetoothConnection implements ISemConnection
 	
 	private SemBluetoothConnection(String address) 
 	{ 
+		
+		/*SensorService.serviceContext.registerReceiver(reconnectionRequestReciever,reconnectionRequest);
+		
+		SensorService.serviceContext.registerReceiver(startReconnectionReciever,startRequest);*/
+		
 		_portAddress = address;
 
 		// Get local Bluetooth adapter
@@ -177,7 +210,7 @@ public class SemBluetoothConnection implements ISemConnection
 	 */
 	public void connect(String address)
 	{
-		if(mState == STATE_NONE)
+		if(mState == STATE_NONE || mState == STATE_RECONNECTING )
 		{
 			_portAddress = address;
 			if(address != null) connectToDeviceWithAddress(address);
@@ -304,8 +337,8 @@ public class SemBluetoothConnection implements ISemConnection
         		// Cancel any thread currently running a connection
         		if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
 
-        		setState(STATE_NONE);
-        		
+        		setState(STATE_NONE); 
+        		//reconnectDevice();
         		// Start the thread to connect with the given device
         		mConnectThread = new ConnectThread(device);
         		if(mConnectThread.isDeviceValid())
@@ -369,8 +402,9 @@ public class SemBluetoothConnection implements ISemConnection
     {
         if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
         if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
-        setState(STATE_NONE);
-		fireConnectionClosedEvent();
+        setState(STATE_NONE);    
+        reconnectDevice();
+		//fireConnectionClosedEvent();
     }
     
     private synchronized void writeData(byte[] bufferToWrite, int sizeOfBuffer)
@@ -394,36 +428,149 @@ public class SemBluetoothConnection implements ISemConnection
    
     private synchronized void setState(int state)
     {
-        mState = state;        
+        mState = state; 
+        /*if(mState==0 && equivitalAddress!=null)
+        {        	
+        	  reconnectDevice();        	
+        }*/
         sensorHandler=SensorConnections.chestSensorHandler;
         sensorHandler.obtainMessage(SensorConnections.BLUETOOTH_STATE_CHANGE,state,-1).sendToTarget();
-        
     }
-
+	  	
+   
+	
+	
     public static synchronized int getState()
     {
         return mState;
     }
 
     private void connectionFailed(IOException e)
-    {
-        setState(STATE_NONE);
-        fireConnectionFailedEvent(e);
+    {   
+    	if(timer1==null)
+    	{
+    		reconnectDevice();  
+    	}
     }
 
     private void connectionSucceeded()
     {
         fireConnectionSucceededEvent();
     }
+    
+    public void reconnectDevice()
+    {
+    	Count=0;    		    		
+		timer1=new Timer();		
+		Reconnect mReconnectDevice=new Reconnect();	
+		/*Intent scheduleCheckConnection = new Intent(SensorService.ACTION_START_RECONNECTING);
+		startReconnection = PendingIntent.getBroadcast(SensorService.serviceContext, 0, scheduleCheckConnection , 0);
+		SensorService.mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+				SystemClock.elapsedRealtime()+1000, 1000*3,startReconnection);		*/
+		timer1.scheduleAtFixedRate(mReconnectDevice,1000,3000);   
+		setState(STATE_RECONNECTING);
+    }
+    
+   /* BroadcastReceiver startReconnectionReciever = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			// TODO Auto-generated method stub
+			String action=intent.getAction();
+			if(action==SensorService.ACTION_START_RECONNECTING)
+			{				
+				IsScheduled=true;
+			   if(equivitalAddress!=null)
+				{									
+				Log.d("SemBluetoothConnection","reconnecting...");
+				if( isConnected()!=true && Count<=10)
+				{
+					     connect(equivitalAddress);
+					     Count++;
+					     
+				}
+				else
+				{
+					SensorService.mAlarmManager.cancel(startReconnection);
+					IsScheduled=false;
+					//startReconnection=null;
+					 if(isConnected()!=true)
+					{						
+						fireConnectionClosedEvent();					
+				        setState(STATE_NONE);
+				       /// SensorService.serviceContext.unregisterReceiver(reconnectionRequestReciever);
+				        Intent i=new Intent(SensorService.ACTION_START_SOUND);
+				        SensorService.serviceContext.sendBroadcast(i);
+					}
+				}
+			}
+			else
+			 {
+				   Log.d("SemBluetoothConnection","A Initial Connection has to be established before reconnecting");
+				   
+			 }
+		  }
+		}
+    	
+    };*/
+    
+    BroadcastReceiver reconnectionRequestReciever = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			// TODO Auto-generated method stub
+			String action=intent.getAction();
+			if(action==SensorService.ACTION_RECONNECT_CHESTSENSOR)
+			{
+			   reconnectDevice();
+			}
+		}
+    	
+    };
+    
+   
 
     private void connectionLost(IOException e)
-    {
-        setState(STATE_NONE);
-        fireConnectionClosedEvent();
+    {     	
+    	if(timer1==null)
+    	{
+    		reconnectDevice();  
+    	}
     }
 
 
-    /**
+    public class Reconnect extends TimerTask{
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			if(isConnected()!=true && Count<=10)
+			{
+				     connect(equivitalAddress);
+				     Count++;
+			
+			}
+			else
+			{
+				if(timer1!=null)
+				{
+				timer1.cancel();
+				}
+				timer1=null;
+				isAttemptSuccessful=false;
+				if(isConnected()!=true)
+				{
+					fireConnectionClosedEvent();					
+			        setState(STATE_NONE);
+			       /// SensorService.serviceContext.unregisterReceiver(reconnectionRequestReciever);
+			        Intent i=new Intent(SensorService.ACTION_START_SOUND);
+			       SensorService.serviceContext.sendBroadcast(i);
+				}
+			}
+			
+		} 
+    }
+    
+    
+   
+	/**
      * This thread runs while attempting to make an outgoing connection
      * with a device. It runs straight through; the connection either
      * succeeds or fails.

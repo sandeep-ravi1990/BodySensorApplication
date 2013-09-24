@@ -90,7 +90,9 @@ public class SensorConnections extends Activity {
 			case SemBluetoothConnection.STATE_NONE:
 				tvSetChestStatus.setText("Not Connected");
 				break;
-			
+			case SemBluetoothConnection.STATE_RECONNECTING:
+				tvSetChestStatus.setText("Reconnecting...");
+				break;			
 			default: 
 				tvSetChestStatus.setText("An error has occured");
 				break;
@@ -195,7 +197,8 @@ public class SensorConnections extends Activity {
             if (resultCode == Activity.RESULT_OK) 
             {
 				String address = data.getStringExtra(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
-				BluetoothDevice device = btAdapter.getRemoteDevice(address);				
+				BluetoothDevice device = btAdapter.getRemoteDevice(address);		
+				String name=device.getName();
 				if(device.getName().contains("AffectivaQ"))
 				{
 				Intent connectIntent = new Intent(SensorService.ACTION_CONNECT_BLUETOOTH);
@@ -237,14 +240,9 @@ public class SensorConnections extends Activity {
 					Intent connectChest = new Intent(SensorService.ACTION_CONNECT_CHEST);	
 					connectChest.putExtra(SensorService.KEY_ADDRESS,address);
 					this.sendBroadcast(connectChest);
-					
-					
-					
-				
 				}
 				else
-				{
-					
+				{					
 					Toast.makeText(getApplicationContext(),"Please select the devices with 'EQ' Prefix",Toast.LENGTH_LONG).show();
 				
 				}
@@ -259,10 +257,6 @@ public class SensorConnections extends Activity {
 				
         }
     }
-	
-	
-	
-	
 
 	public boolean turnOnBt() {
 		// TODO Auto-generated method stub
@@ -305,11 +299,6 @@ public class SensorConnections extends Activity {
 					break;
                 
                 }
-                
-            
-            
-                
-               
             }
         }
     };
@@ -332,22 +321,21 @@ public class SensorConnections extends Activity {
 					tvSetChestStatus.setText("Listening for a Connection...");
 					break;
 				case SemBluetoothConnection.STATE_NONE:
-					tvSetChestStatus.setText("Not Connected");
+					tvSetChestStatus.setText("Not Connected");					
 					break;
-				
+				case SemBluetoothConnection.STATE_RECONNECTING:
+					tvSetChestStatus.setText("Reconnecting...");
+					break;				
 				default: 
 					tvSetChestStatus.setText("An error has occured");
 					break;
                 
-                }
-                
-            
-            
-                
-               
+                }     
             }
         }
     };
+    
+    
 	
 	
 	

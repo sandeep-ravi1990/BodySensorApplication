@@ -10,12 +10,18 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.AlarmManager;
 import android.app.ListActivity;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.StrictMode;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -78,7 +84,13 @@ public class MainActivity extends ListActivity {
 	HttpURLConnection connection = null;
 	DataOutputStream outputStream = null;
 	DataInputStream inputStream = null;
-	
+	public  Context mainActivityContext=this;
+	private static AlarmManager mAlarmManager;
+	private static PendingIntent scheduleCheck;
+	Runtime info;
+	long freeSize; 
+    long totalSize;
+    long usedSize;
 	Calendar cl=Calendar.getInstance();
 	SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 	String dateObj =curFormater.format(cl.getTime());
@@ -165,7 +177,6 @@ public class MainActivity extends ListActivity {
             startActivity(enableIntent);
         }
         
-       
         
         startSService();
                 
@@ -173,6 +184,7 @@ public class MainActivity extends ListActivity {
     }
     
     
+	
     private void uploadFiles(String urlServer,String Path) {
 		// TODO Auto-generated method stub
     	
@@ -219,10 +231,10 @@ public class MainActivity extends ListActivity {
     	outputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
     	
     	// Responses from the server (code and message)
-    	/*
+    	
     	int serverResponseCode = connection.getResponseCode();
     	String serverResponseMessage = connection.getResponseMessage();
-    	*/
+    	
     	
     	fileInputStream.close();
     	outputStream.flush();
@@ -241,7 +253,8 @@ public class MainActivity extends ListActivity {
     	{
     	//Exception handling
     	e.printStackTrace();
-    	setTitle(e.getMessage());
+    	setTitle(e.getMessage());    	
+    	
     	}
     	   	
     	
@@ -264,15 +277,12 @@ public class MainActivity extends ListActivity {
     private void stopSService() {
     	mIsRunning = false; 
     	this.stopService(new Intent(MainActivity.this,SensorService.class));
-    	 
+    	
     }
     private void startSService() {
         if (! mIsRunning) {
             mIsRunning = true;            
-	         this.startService(new Intent(MainActivity.this,SensorService.class));
-	       /*//Start Activity Recognition Service
-	        ActivityRecognitionScan activityScan=new ActivityRecognitionScan(getApplicationContext());
-	 		activityScan.startActivityRecognitionScan();*/
+	         this.startService(new Intent(MainActivity.this,SensorService.class)); 
         }
     }
     

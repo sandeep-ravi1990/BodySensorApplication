@@ -15,10 +15,10 @@ import android.util.Log;
 
 
 public class ActivityRecognitionScan  implements GooglePlayServicesClient.ConnectionCallbacks, GooglePlayServicesClient.OnConnectionFailedListener {
-	
-	
+
+
 	private Context mContext;
-	
+
 	private static final String TAG = "ActivityRecognition";
 	private static ActivityRecognitionClient mActivityRecognitionClient;	
 	private static PendingIntent mActivityRecognitionPendingIntent;
@@ -58,11 +58,11 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
 	/**
 	* Connection established - start listening now
 	*/
-	
+
 	@Override
 	public void onDisconnected() {
 	}
-	
+
 	private ActivityRecognitionClient getActivityRecognitionClient() 
 	{
         if (mActivityRecognitionClient == null) 
@@ -71,7 +71,7 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
         }
         return mActivityRecognitionClient;
     }
-	
+
 	 private void continueRequestActivityUpdates() 
 	 {
 	        /*
@@ -83,7 +83,7 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
 	        // Disconnect the client
 	       // requestDisconnection();
 	    }
-	 
+
 	 private void requestDisconnection() 
 	 {
 	        getActivityRecognitionClient().disconnect();
@@ -94,9 +94,9 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
 	{
 		// TODO Auto-generated method stub		
 		continueRequestActivityUpdates();
-		
+
 	}
-	
+
 	 public PendingIntent getRequestPendingIntent() {
 	        return mActivityRecognitionPendingIntent;
 	    }
@@ -109,7 +109,7 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
 	        mActivityRecognitionPendingIntent = intent;
 	  }
 
-	
+
 	private PendingIntent createRequestPendingIntent() {
 
         // If the PendingIntent already exists

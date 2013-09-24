@@ -29,20 +29,25 @@ import org.apache.http.message.BasicNameValuePair;
 
 import edu.missouri.bas.MainActivity;
 import edu.missouri.bas.R;
+import edu.missouri.bas.SensorConnections;
 import edu.missouri.bas.SurveyStatus;
 import edu.missouri.bas.bluetooth.BluetoothRunnable;
 import edu.missouri.bas.bluetooth.affectiva.AffectivaPacket;
 import edu.missouri.bas.bluetooth.affectiva.AffectivaRunnable;
+import edu.missouri.bas.bluetooth.equivital.EquivitalRunnable;
+import edu.missouri.bas.datacollection.InternalSensor;
 import edu.missouri.bas.service.modules.location.ActivityRecognitionScan;
 import edu.missouri.bas.service.modules.location.DetectionRemover;
 import edu.missouri.bas.service.modules.location.LocationControl;
 import edu.missouri.bas.service.modules.sensors.SensorControl;
 
 import edu.missouri.bas.survey.XMLSurveyActivity;
+import edu.missouri.bas.survey.XMLSurveyActivity.StartSound;
 import edu.missouri.bas.survey.answer.SurveyAnswer;
 
 
 import android.R.string;
+import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -60,12 +65,17 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
@@ -113,13 +123,11 @@ import org.apache.http.util.EntityUtils;
 
 public class SensorService extends Service  implements ISemDeviceSummaryEvents,SensorEventListener {//ISemDeviceHeartRateEvents,ISemDeviceBreathingRateEvents, 
 
-    private final String TAG = "SensorService";
-    
-    
+    private final String TAG = "SensorService";   
 	/*
 	 * Android component variables used by the service
 	 */
-	private static Context serviceContext;
+	public static Context serviceContext;
 	private IBinder mBinder = new ServiceBinder<SensorService>(SensorService.this);
 
 	/*
@@ -155,10 +163,13 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	/*
 	 * Alarm manager variables, for scheduling intents
 	 */
-	private static AlarmManager mAlarmManager;
+	public static AlarmManager mAlarmManager;
 	private PendingIntent scheduleSurvey;
 	private PendingIntent scheduleSensor;
 	private static PendingIntent scheduleLocation;
+	private static PendingIntent scheduleCheck;
+	private static PendingIntent triggerSound;
+	private static PendingIntent triggerSound2;
 	//private PendingIntent surveyIntent;
 
 	/*
@@ -173,8 +184,16 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	public static final String ACTION_STOP_LOCATIONCONTROL = "INTENT_ACTION_STOP_LOCATIONCONTROL";
 	
 	public static final String ACTION_SENSOR_DATA = "INTENT_ACTION_SENSOR_DATA";
+	
+	private static final String ACTION_TRIGGER_SOUND = "INTENT_ACTION_TRIGGER_SOUND";
+	
+	private static final String ACTION_TRIGGER_SOUND2 = "INTENT_ACTION_TRIGGER_SOUND2";	
+	
+	private static final String ACTION_SCHEDULE_CHECK = "INTENT_ACTION_SCHEDULE_CHECK";
 
 	public static final String ACTION_TRIGGER_SURVEY = "INTENT_ACTION_TRIGGER_SURVEY";
+	
+	public static final String ACTION_START_SOUND    =  "INTENT_ACTION_START_SOUND";
 	
 	public static final String ACTION_CONNECT_BLUETOOTH = "INTENT_ACTION_CONNECT_BLUETOOTH";
 	
@@ -185,6 +204,10 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	public static final String ACTION_BLUETOOTH_RESULT = "INTENT_ACTION_BLUETOOTH_RESULT";
 	
 	public static final String ACTION_BLUETOOTH_STATE_RESULT = "INTENT_ACTION_BLUETOOTH_STATE_RESULT";
+	
+	public static final String ACTION_RECONNECT_CHESTSENSOR ="INTENT_ACTION_RECONNECT_CHESTSENSOR";	
+	
+	public static final String ACTION_START_RECONNECTING ="INTENT_ACTION_START_RECONNECTING";
 
 	public static final String INTENT_EXTRA_BT_DEVICE = "EXTRA_DEVICE_ADR";
 	
@@ -255,10 +278,13 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	Thread FileWriterThread;
 	HttpPostThread httpPostRunnable;
 	Runnable fileWriterRunnable;
-	
+	InternalSensor Accelerometer;
+	InternalSensor LightSensor;
+	InternalSensor Pressure;
 	
 	Notification mainServiceNotification;
 	public static final int SERVICE_NOTIFICATION_ID = 1;
+	
 	
 	private static SemDevice device;
 
@@ -282,14 +308,16 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	public static boolean IsRetrievingUpdates=false;
 	
 		
-	
-	
-	
-	
-	
-	
-	
-	
+	private SoundPool mSoundPool;
+	private int SOUND1=1;
+	private int SOUND2=2;
+	private HashMap<Integer, Integer> soundsMap;
+	/*public StartSound ss;
+	public StartSound2 ss2;
+	public static StartSound mSound1;
+	public static StartSound2 mSound2;*/
+	static Timer mTimer;
+	int reconnectionAttempts=0;
 	/*
 	 * (non-Javadoc)
 	 * @see android.app.Service#onBind(android.content.Intent)
@@ -297,7 +325,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	@Override
 	public IBinder onBind(Intent arg0) {
 		return mBinder;
-	}
+			}
 	
 	@SuppressWarnings("deprecation")
 	@Override
@@ -305,23 +333,33 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		
 		super.onCreate();
 		Log.d(TAG,"Starting sensor service");
-		
+		mSoundPool = new SoundPool(4, AudioManager.STREAM_MUSIC, 100);
+        soundsMap = new HashMap<Integer, Integer>();
+        soundsMap.put(SOUND1, mSoundPool.load(this, R.raw.bodysensor_alarm, 1));
+        soundsMap.put(SOUND2, mSoundPool.load(this, R.raw.voice_notification, 1));       
 		//Setup service context
 		serviceContext = this;
-		
+		/*mSound1=new StartSound();
+		mSound2=new StartSound2();*/
 		//Get sensor manager 
 		mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
+		/*Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL);
+		Accelerometer.run();		
+		LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL);
+		LightSensor.run();*/
+		//Pressure=new InternalSensor(mSensorManager,Sensor.TYPE_PRESSURE,SensorManager.SENSOR_DELAY_NORMAL);
+		//Pressure.run();
+		/*mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
 		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT), SensorManager.SENSOR_DELAY_NORMAL);
 		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE), SensorManager.SENSOR_DELAY_NORMAL);
-		//Get alarm manager
+		*///Get alarm manager
 		mAlarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		
 		//Get location manager
 		mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		
-		activityRecognition=new ActivityRecognitionScan(serviceContext);
-		activityRecognition.startActivityRecognitionScan();
+		/*activityRecognition=new ActivityRecognitionScan(getApplicationContext());
+		activityRecognition.startActivityRecognitionScan();*/
 		
 		mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
 		
@@ -347,6 +385,8 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		notification.flags|=Notification.FLAG_ONGOING_EVENT;
 		notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		
+		
+		
 		Intent notifyIntent = new Intent(Intent.ACTION_MAIN);
 		notifyIntent.setClass(this, MainActivity.class);
 		
@@ -358,14 +398,12 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
                 notifyIntent, Notification.FLAG_ONGOING_EVENT);
         notification.setLatestEventInfo(SensorService.this, getString(R.string.app_name),
         		"Recording service started at: "+cal.getTime().toString(), contentIntent);
-        notificationManager.notify(SensorService.SERVICE_NOTIFICATION_ID, notification);
-		
+        notificationManager.notify(SensorService.SERVICE_NOTIFICATION_ID, notification);		
+       
+        
 		/*
 		 * Setup IO for recording
 		 */
-        
-       
-        
 		try {
 			prepareIO();
 		} catch (IOException e) {
@@ -417,10 +455,193 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		sdk.developerName = "Java Version";
 		sdk.licenseCode = "ZAP0Q9FLGo/XwrdBBAtdFk8jK7i/6fXFMzKiaCtC7jNvChtpMoOxSaH7tdqtFkmMbjUaskRyLGFCTGVJdNlrFjfbBjSGng9NGL4pnJ49TRTNR8Zmq0E9wnydpo3Du8RAcBVdGYjTjTctplrJ/cYHPHxOnbY5QuHYkY3dXBF3CSE=";
 		
+		Calendar c=Calendar.getInstance();
+		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+		String dateObj =curFormater.format(c.getTime()); 		
+		String file_name="Mac_Address"+dateObj+".txt";
+		String Path = Environment.getExternalStorageDirectory().getPath() + "/TestResults/"+file_name;
+		File file = new File(Path);
+		String address =  null;
+		if(file.exists())
+		{
+			BufferedReader br;
+			try {
+				br = new BufferedReader(new FileReader(Path));
+				StringBuilder sb = new StringBuilder();
+				String SCurrentLine = "";
+		        while ((SCurrentLine = br.readLine()) != null) 
+		        {		            
+		            address = SCurrentLine;
+		        }
+		        if(!(address.equals(null)))
+		        {
+		        Intent i = new Intent();
+		        i.setClass(this, SensorConnections.class);
+		        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(i);
+				Timer connectionTimer=new Timer();
+				connectionTimer.schedule(new ConnectSensor(address),1000*3);
+		        //EquivitalRunnable equivitalThread=new EquivitalRunnable(address);
+				//equivitalThread.run();
+		        }
+				
+			} 		    
+		     catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}		
+		
+		Intent scheduleCheckConnection = new Intent(SensorService.ACTION_SCHEDULE_CHECK);
+		scheduleCheck = PendingIntent.getBroadcast(serviceContext, 0, scheduleCheckConnection , 0);
+		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*1,1000*60*1,scheduleCheck);
+		
 	   }
 	
 	
 	
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) 
+	{
+		// TODO Auto-generated method stub	
+		this.startForeground(SensorService.SERVICE_NOTIFICATION_ID, notification);
+		return START_REDELIVER_INTENT;
+	}
+
+
+
+	BroadcastReceiver checkRequestReceiver = new BroadcastReceiver() {
+
+		@Override
+		public void onReceive(Context arg0, Intent intent) {
+			// TODO Auto-generated method stub
+			String action = intent.getAction();
+			//Log.d(TAG, "Check Request Recieved");
+			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){
+				int state=SemBluetoothConnection.getState();			
+				if(state==0 || state==1)
+				{				
+					File f=new File(BASE_PATH,"ConnectionAttempts.txt");
+					Calendar cal=Calendar.getInstance();
+			   		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));
+					try {
+						writeToFile(f,String.valueOf(cal.getTime())+" "+String.valueOf(reconnectionAttempts)+" "+SemBluetoothConnection.equivitalAddress);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					reconnectionAttempts++;
+					Intent i=new Intent(SensorService.ACTION_RECONNECT_CHESTSENSOR);
+					serviceContext.sendBroadcast(i);
+				}
+				
+				/*ActivityManager activityManager = (ActivityManager)serviceContext.getSystemService(ACTIVITY_SERVICE);
+				Runtime info = Runtime.getRuntime();
+			    long freeSize = info.freeMemory();
+		        long totalSize= info.totalMemory();
+		        long usedSize = totalSize - freeSize;
+				Log.d(TAG,String.valueOf(usedSize/1024)+"/"+String.valueOf(totalSize/1024));*/
+				
+			}
+		}
+		
+	};
+        
+	
+	
+	BroadcastReceiver soundRequestReceiver = new BroadcastReceiver() {
+
+		@Override
+		public void onReceive(Context arg0, Intent intent) {
+			// TODO Auto-generated method stub
+			String action = intent.getAction();
+			if(action.equals(SensorService.ACTION_START_SOUND)){
+				Log.d(TAG,"Task Scheduled to run Sound Effects");
+				startSound();				
+			}
+			else if(action.equals(SensorService.ACTION_TRIGGER_SOUND))
+			{
+				playSound(1,1.0f);
+				Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+		        v.vibrate(1000);   
+			}
+			else if(action.equals(SensorService.ACTION_TRIGGER_SOUND2))
+			{
+				playSound(2,1.0f);				 
+			}
+
+		}
+		
+	};
+	
+		
+	
+	 public void startSound()
+	{  		 
+	    /*mTimer=new Timer();
+	    ss=new StartSound();
+		ss2=new StartSound2();
+		mTimer.schedule(ss,1000);
+		mTimer.schedule(ss2,1000*19);*/
+		 Intent scheduleTriggerSound = new Intent(SensorService.ACTION_TRIGGER_SOUND);
+		 Intent scheduleTriggerSound2 = new Intent(SensorService.ACTION_TRIGGER_SOUND2);
+		 triggerSound = PendingIntent.getBroadcast(serviceContext, 0, scheduleTriggerSound , 0);
+		 triggerSound2 = PendingIntent.getBroadcast(serviceContext, 0, scheduleTriggerSound2 , 0);		 
+		 mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+					SystemClock.elapsedRealtime()+1000 ,triggerSound);	
+		 mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+					SystemClock.elapsedRealtime()+1000*20 ,triggerSound2);
+		
+	}
+	
+	 public class ConnectSensor extends TimerTask
+	 {
+		 String mAddress;
+		 public ConnectSensor(String Mac_Address)
+		 {
+			 mAddress=Mac_Address;
+			 
+		 }
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			Intent connectChest = new Intent(SensorService.ACTION_CONNECT_CHEST);	
+			connectChest.putExtra(SensorService.KEY_ADDRESS,mAddress);
+			serviceContext.sendBroadcast(connectChest);
+		}
+		 
+		  
+	 }
+	/*public class StartSound extends TimerTask
+	{
+		@Override
+		public void run() {			
+			// TODO Auto-generated method stub
+			//MediaPlayer.create(serviceContext, R.raw.bodysensor_alarm).start();
+			playSound(1,1.0f);
+			Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+	        v.vibrate(1000);        
+	        
+		}	
+	}
+	
+	public class StartSound2 extends TimerTask
+	{
+		@Override
+		public void run() {
+			// TODO Auto-generated method stub
+			playSound(2,1.0f);
+		}	
+	}*/
+	
+	
+	public void playSound(int sound, float fSpeed) {
+        AudioManager mgr = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
+        float streamVolumeCurrent = mgr.getStreamVolume(AudioManager.STREAM_MUSIC);        
+        float volume = streamVolumeCurrent;
+        mSoundPool.play(soundsMap.get(sound), volume, volume, 1, 0, fSpeed);  
+       
+       }
 
 
 	private void prepareAlarms(){
@@ -437,12 +658,12 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
 				SystemClock.elapsedRealtime() + 1000 + (1000 * 60 * randomTime), scheduleSurvey);
 		
-		Intent scheduleSensorIntent = 
+		/*Intent scheduleSensorIntent = 
 				new Intent(SensorService.ACTION_SCHEDULE_SENSOR);
 		scheduleSensor = PendingIntent.getBroadcast(
 				serviceContext, 0, scheduleSensorIntent, 0);
 		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime() + 10000, 1000 * 31, scheduleSensor);
+				SystemClock.elapsedRealtime() + 10000, 1000 * 31, scheduleSensor);*/
 		
 		/*Intent scheduleLocationIntent = new Intent(SensorService.ACTION_SCHEDULE_LOCATION);
 		scheduleLocation = PendingIntent.getBroadcast(
@@ -463,22 +684,29 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		IntentFilter surveyTest =
 				new IntentFilter("ACTION_SURVEY_TEST");
 
-		IntentFilter bluetoothConnect = new IntentFilter(ACTION_CONNECT_BLUETOOTH);
+		IntentFilter bluetoothConnect = new IntentFilter(ACTION_CONNECT_BLUETOOTH);		
 		IntentFilter bluetoothDisconnect = new IntentFilter(ACTION_DISCONNECT_BLUETOOTH);
 		IntentFilter bluetoothUpdate = new IntentFilter(ACTION_GET_BLUETOOTH_STATE);
-		
-		
+		IntentFilter soundRequest=new IntentFilter(ACTION_START_SOUND);
+		IntentFilter checkRequest=new IntentFilter(ACTION_SCHEDULE_CHECK);
 		IntentFilter locationFoundFilter = new IntentFilter(LocationControl.INTENT_ACTION_LOCATION);
-		SensorService.this.registerReceiver(alarmReceiver, sensorSchedulerFilter);
-		SensorService.this.registerReceiver(alarmReceiver, surveySchedulerFilter);
+		IntentFilter sound1=new IntentFilter(ACTION_TRIGGER_SOUND);
+		IntentFilter sound2=new IntentFilter(ACTION_TRIGGER_SOUND2);
+		//SensorService.this.registerReceiver(alarmReceiver, sensorSchedulerFilter);
+		//SensorService.this.registerReceiver(alarmReceiver, surveySchedulerFilter);
 		SensorService.this.registerReceiver(alarmReceiver, locationSchedulerFilter);
 		SensorService.this.registerReceiver(alarmReceiver, locationFoundFilter);
 		SensorService.this.registerReceiver(alarmReceiver, locationInterruptSchedulerFilter);
 		SensorService.this.registerReceiver(alarmReceiver, surveyScheduleFilter);
 		SensorService.this.registerReceiver(alarmReceiver, surveyTest);
-		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothConnect);
+		SensorService.this.registerReceiver(soundRequestReceiver,soundRequest);
+		SensorService.this.registerReceiver(soundRequestReceiver,sound1);
+		SensorService.this.registerReceiver(soundRequestReceiver,sound2);
+		SensorService.this.registerReceiver(checkRequestReceiver,checkRequest);
+		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothConnect);		
 		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothDisconnect);
 		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothUpdate);
+		
 		
 		
 		/*Chest Sensor Intent Filter*/
@@ -560,6 +788,15 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		//sensorControl.cancel();
 		//SensorThread.stopRecording();
 		
+		File f = new File(BASE_PATH,"SensorServiceEvents.txt");
+		Calendar cal=Calendar.getInstance();
+		try {
+			writeToFile(f,"Destroyed at "+String.valueOf(cal.getTime()));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}	
+		
 		httpPostRunnable.stop();
 		
 		try {
@@ -584,11 +821,19 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		SensorService.this.unregisterReceiver(alarmReceiver);
 		SensorService.this.unregisterReceiver(bluetoothReceiver);
 		SensorService.this.unregisterReceiver(chestSensorReceiver);
+		SensorService.this.unregisterReceiver(soundRequestReceiver);
+		SensorService.this.unregisterReceiver(checkRequestReceiver);
 		mSensorManager.unregisterListener(this);
 		mAlarmManager.cancel(scheduleSurvey);
 		mAlarmManager.cancel(scheduleSensor);
-		mAlarmManager.cancel(scheduleLocation);		
-		activityRecognition.stopActivityRecognitionScan();
+		mAlarmManager.cancel(scheduleLocation);	
+		mAlarmManager.cancel(scheduleCheck);
+		mAlarmManager.cancel(triggerSound);
+		mAlarmManager.cancel(triggerSound2);
+		/*activityRecognition.stopActivityRecognitionScan();
+		Accelerometer.stop();
+		LightSensor.stop();*/
+		//Pressure.stop();
 		//mAlarmManager.cancel(surveyIntent);
 		
 		serviceWakeLock.release();
@@ -660,9 +905,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		
 	}
 	
-	
-	
-	
 	BroadcastReceiver alarmReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -671,7 +913,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 				Log.d(TAG,"Received alarm event - schedule sensor");
 				//sensorControl.startRecording(); 
 				
-			}
+			}			
 			else if(action.equals(SensorService.ACTION_SENSOR_DATA)){
 				/*Log.d(TAG,"Sensor Data Received");
 				HashMap<String, String> sensorMap =
@@ -754,10 +996,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 							t5.schedule(new ScheduleSurvey(TriggerInterval),dt5);
 							t6.schedule(new ScheduleSurvey(TriggerInterval),dt6);
 							setStatus(true);
-							
-							
-							
-							
 			}
 			
 			else if (action.equals(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS)){
@@ -785,19 +1023,20 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		}
 	};
 	
-   public void setBrightness(float value){
-		
+   public void setBrightness(float value)
+   {		
 	   int brightnessInt=(int)(value*255);
 	   Settings.System.putInt(getContentResolver(),
 			   Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
 			   Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, brightnessInt);
+   }
+   
 
-	}
-	
-	
 	
 	public static void CancelTimers()
 	{
+		if(t1!=null&&t2!=null&&t3!=null&&t4!=null&&t5!=null&&t6!=null&&mTimer!=null)
+		{
 		t1.cancel();
 		t1.purge();
 		t2.cancel();
@@ -809,21 +1048,19 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		t5.cancel();
 		t5.purge();
 		t6.cancel();
-		t6.purge();		
-		
-	}
-	
+		t6.purge();	
+		mTimer.cancel();
+		}
+	}	
 	
 	public static void setStatus(boolean value)
 	{
-		IsScheduled = value;
-		
+		IsScheduled = value;		
 	}
 	
 	
 	public static boolean getStatus()
-	{
-		
+	{		
 		return IsScheduled;
 	}
 	
@@ -1178,8 +1415,9 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			String action = intent.getAction();
 			if(action.equals(SensorService.ACTION_CONNECT_CHEST)){
 				Toast.makeText(getApplicationContext(),"Intent Received",Toast.LENGTH_LONG).show();
-				String address=intent.getStringExtra(KEY_ADDRESS);
-				try
+				String address=intent.getStringExtra(KEY_ADDRESS);				
+				
+				/*try
 				{
 					device = new SemDevice();
 					device.setSummaryDataEnabled(true);
@@ -1188,30 +1426,44 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 				{
 					Toast.makeText(getApplicationContext(),"ERROR:License Code and Developer Name don't match",Toast.LENGTH_LONG).show();
 					return;
-				}		
+				}*/		
+				EquivitalRunnable equivitalThread=new EquivitalRunnable(address);
+				equivitalThread.run();
+				Calendar c=Calendar.getInstance();
+				SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+				String dateObj =curFormater.format(c.getTime()); 		
+				String file_name="Mac_Address"+dateObj+".txt";			
 				
-					connectToDevice(address);
+				Calendar cal=Calendar.getInstance();
+				cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
+				
+		        File f = new File(BASE_PATH,file_name);		
+				
+				if(f != null){
+					try {
+						writeToFile(f, address);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+							
+					
+				}	
+				
+			    //connectToDevice(address);
 			}
 		}
 		
 	};
 
-	private void connectToDevice(String address) {
+	private void connectToDevice(String address) 
+	{
 		Toast.makeText(getApplicationContext(), "Trying to connect to the device",Toast.LENGTH_LONG).show();
 	   	Log.d(TAG,"Entered connectToDevice Method");
 		// TODO Auto-generated method stub
-	    device.addSummaryEventListener(this);
-	   	 //device.addBreathingRateEventListener(this);
-	   	//device.addHeartRateEventListener(this);
+	    device.addSummaryEventListener(this);	   	
 		device.setSummaryDataEnabled(true);
 		ISemConnection connection = SemBluetoothConnection.createConnection(address);	
-		device.start(connection);	
-		/*device.setOperatingMode(SemOperatingModeType.TurnOnShortHRMeasurements );
-		device.setCalibrationParameter(SemCalibrationParameterType.HRstTimeWindow,1);	*/
-		
-		   
-	    
-	    
+		device.start(connection);
 	}
 
 	@Override
@@ -1224,7 +1476,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 				arg1.getSummary().getQualityConfidence().getECGQuality(),
 				arg1.getSummary().getQualityConfidence().getImpedanceQuality(),
 				arg1.getSummary().getQualityConfidence().getHeartRateConfidence(),
-				arg1.getSummary().getQualityConfidence().getBreathingRateConfidence());
+				arg1.getSummary().getQualityConfidence().getBreathingRateConfidence(),arg1.getSummary().getGalvanicSkinResistance());
 		
 	}
 
@@ -1232,11 +1484,11 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			double beltSensorRate, double ecgDerivedRate, double impedanceRate,
 			double ecgRate, double beltQuality, double ecgQuality,
 			double impedanceQuality, double heartRateConfidence,
-			double breathingRateConfidence) {
+			double breathingRateConfidence,double GSR) {
 		// TODO Auto-generated method stub
 		 String dataFromChestSensor=motion+","+bodyPosition+","+String.valueOf(beltSensorRate)+","+String.valueOf(ecgDerivedRate)+","+
 				 String.valueOf(impedanceRate)+","+String.valueOf(ecgRate)+","+String.valueOf(beltQuality)+","+String.valueOf(ecgQuality)+","+
-				 String.valueOf(impedanceQuality)+","+String.valueOf(heartRateConfidence)+","+String.valueOf(breathingRateConfidence);	
+				 String.valueOf(impedanceQuality)+","+String.valueOf(heartRateConfidence)+","+String.valueOf(breathingRateConfidence)+","+String.valueOf(GSR);	
 		 Message msgData=new Message();
 		 msgData.what = CHEST_SENSOR_DATA;
 		 Bundle dataBundle = new Bundle();
@@ -1244,122 +1496,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		 msgData.obj=dataBundle;
 		 chestSensorDataHandler.sendMessage(msgData);
 	}
-	
-	
-	
-	
-/*	@Override
-	public void heartRateConfidenceDataReceived(SemDevice arg0,
-			QualityConfidenceEventArgs arg1) {
-		// TODO Auto-generated method stub
-		hrConfidence=arg1.getPercentage();
-	}
-
-	@Override
-	public void heartRateDataReceived(SemDevice arg0, HeartRateEventArgs arg1) {
-		// TODO Auto-generated method stub
-     
-		Calendar cal=Calendar.getInstance();
-		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));        
-		String currentTime = String.valueOf(cal.getTime());	
-		updateHeartRate(currentTime,String.valueOf(arg1.getBeatsPerMinute()));
-		
-	}
-*/
-	
-	/*@Override
-	public void rrIntervalDataReceived(SemDevice arg0, RRIntervalEventArgs arg1) {
-		// TODO Auto-generated method stub		
-		Calendar cal=Calendar.getInstance();
-		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));        
-		String currentTime = String.valueOf(cal.getTime());		
-		DecimalFormat df = new DecimalFormat("#.0");
-		String HeartRate;
-		if(arg1.getMilliseconds()!=0)
-		{
-		HeartRate=df.format(60000/arg1.getMilliseconds());
-		}
-		else
-		{
-			HeartRate="0.0";
-			
-		}
-		updateHeartRate(currentTime,HeartRate);		
-		
-		
-	}
-	
-	String previousTime=null;
-	private void updateHeartRate(String time, String heartRate2) {
-		// TODO Auto-generated method stub
-		if(previousTime==null)
-		{
-			previousTime=time;
-		}
-		else if(!(previousTime.equals(time)))
-		{
-			 Message msgData=new Message();
-			 msgData.what = CHEST_SENSOR_DATA;
-			 Bundle dataBundle = new Bundle();
-			 dataBundle.putString("DATA",heartRate2+","+String.valueOf(hrConfidence)+","+String.valueOf(brBeltValue)+","+String.valueOf(brConfidence)+","+orientation+","+motion);
-			 msgData.obj=dataBundle;
-			 chestSensorDataHandler.sendMessage(msgData);
-			 previousTime=time;			
-			
-		}
-		
-	}
-
-	
-
-	
-	@Override
-	public void beltRespirationRateDataReceived(SemDevice arg0,
-			RespirationRateEventArgs arg1) {
-		// TODO Auto-generated method stub
-		
-		brBeltValue=arg1.getBreathsPerMinute();
-	}
-
-	
-	
-	
-	@Override
-	public void breathingRateConfidenceDataReceived(SemDevice arg0,
-			QualityConfidenceEventArgs arg1) {
-		// TODO Auto-generated method stub
-	
-	    brConfidence = arg1.getPercentage();
-		
-	}
-
-	@Override
-	public void edrRespirationRateDataReceived(SemDevice arg0,
-			RespirationRateEventArgs arg1) {
-		// TODO Auto-generated method stub
-		
-			brEDRValue=arg1.getBreathsPerMinute();
-		
-	}
-
-	@Override
-	public void impedanceRespirationRateDataReceived(SemDevice arg0,
-			RespirationRateEventArgs arg1) {
-		// TODO Auto-generated method stub
-		 brImpedanceValue=arg1.getBreathsPerMinute();
-		
-	}
-
-	
-	
-	@Override
-	public void summaryDataUpdated(SemDevice arg0, SemSummaryDataEventArgs arg1) {
-		// TODO Auto-generated method stub
-		orientation=arg1.getSummary().getOrientation().name();
-		motion=arg1.getSummary().getMotion().name();
-	}
-	
-	*/
 	
 	Handler chestSensorDataHandler = new Handler(){
 		@Override
@@ -1475,7 +1611,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	    		String Acclerometer_Values = String.valueOf(cal.getTime())+","+event.values[0]+","+event.values[1]+","+event.values[2];
 	    		String file_name="Accelerometer_"+dateObj+".txt";
 	            File f = new File(SensorService.BASE_PATH,file_name);
-	           // sendDatatoServer("Accelerometer_"+dateObj,Acclerometer_Values);
+	            //sendDatatoServer("Accelerometer_"+dateObj,Acclerometer_Values);
 	    		try {
 					writeToFile(f,Acclerometer_Values);
 				} catch (IOException e) {
@@ -1513,7 +1649,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	        	String LightIntensity= String.valueOf(cal.getTime())+","+event.values[0];
 	        	String file_name="LightSensor_"+dateObj+".txt";
 	            File f = new File(SensorService.BASE_PATH,file_name);
-	           // sendDatatoServer("LightSensor_"+dateObj,LightIntensity);
+	            ///sendDatatoServer("LightSensor_"+dateObj,LightIntensity);
 	    		try {
 					writeToFile(f,LightIntensity);
 				} catch (IOException e) {
@@ -1524,7 +1660,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	        }
 	        else if(sensor.getType()==Sensor.TYPE_PRESSURE){				        	
 	        	
-	        	String Pressure= String.valueOf(cal.getTime())+","+event.values[0];
+	        	/*String Pressure= String.valueOf(cal.getTime())+","+event.values[0];
 	        	String file_name="PressureSensor_"+dateObj+".txt";
 	            File f = new File(SensorService.BASE_PATH,file_name);
 	            //sendDatatoServer("PressureSensor_"+dateObj,Pressure);
@@ -1533,7 +1669,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				}
+				}*/
 	        	
 	        }
 	     }
