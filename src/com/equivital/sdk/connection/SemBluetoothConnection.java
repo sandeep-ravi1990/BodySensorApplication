@@ -29,12 +29,10 @@ import com.equivital.sdk.ISemConnection;
 import com.equivital.sdk.ISemConnectionEvents;
 import com.equivital.sdk.ISemConnectionManager;
 import com.equivital.sdk.SemDataReceivedEventArgs;
-
-import edu.missouri.bas.MainActivity;
-import edu.missouri.bas.R;
 import edu.missouri.bas.SensorConnections;
 import edu.missouri.bas.service.SensorService;
-import edu.missouri.bas.survey.XMLSurveyActivity.StartSound;
+
+
 
 /**
  * Implementation of the Equivital ISemConnection interface for the Android Bluetooth Stack 
@@ -65,15 +63,12 @@ public class SemBluetoothConnection implements ISemConnection
     public static final int STATE_CONNECTING = 2; // now initiating an outgoing connection
     public static final int STATE_CONNECTED = 3;  // now connected to a remote device
     public static final int STATE_RECONNECTING = 4;
-    public boolean isAttemptSuccessful=true;
+    public boolean reconnectionStarted=false;
     public static int Count=0;
     public static int Count1=0;
     static Timer timer1;
     PendingIntent startReconnection;
-    boolean IsScheduled=false;
-    IntentFilter reconnectionRequest = new IntentFilter(SensorService.ACTION_RECONNECT_CHESTSENSOR);
     
-    IntentFilter startRequest=new IntentFilter(SensorService.ACTION_START_RECONNECTING);
 
 	/**
 	 * Adds an event listener
@@ -173,8 +168,7 @@ public class SemBluetoothConnection implements ISemConnection
 	 */
 	public static ISemConnection createConnection(String deviceAddress)
 	{
-		equivitalAddress=deviceAddress;		
-		
+		equivitalAddress=deviceAddress;			
 		return new SemBluetoothConnection(deviceAddress);		
 	}
 	
@@ -403,7 +397,7 @@ public class SemBluetoothConnection implements ISemConnection
         if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
         if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
         setState(STATE_NONE);    
-        reconnectDevice();
+        //reconnectDevice();
 		//fireConnectionClosedEvent();
     }
     
@@ -447,10 +441,11 @@ public class SemBluetoothConnection implements ISemConnection
 
     private void connectionFailed(IOException e)
     {   
-    	if(timer1==null)
+    	if(reconnectionStarted!=true)
     	{
-    		reconnectDevice();  
-    	}
+    		reconnectDevice();
+    		reconnectionStarted=true;
+        }
     }
 
     private void connectionSucceeded()
@@ -458,85 +453,27 @@ public class SemBluetoothConnection implements ISemConnection
         fireConnectionSucceededEvent();
     }
     
-    public void reconnectDevice()
-    {
-    	Count=0;    		    		
-		timer1=new Timer();		
-		Reconnect mReconnectDevice=new Reconnect();	
-		/*Intent scheduleCheckConnection = new Intent(SensorService.ACTION_START_RECONNECTING);
-		startReconnection = PendingIntent.getBroadcast(SensorService.serviceContext, 0, scheduleCheckConnection , 0);
-		SensorService.mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime()+1000, 1000*3,startReconnection);		*/
-		timer1.scheduleAtFixedRate(mReconnectDevice,1000,3000);   
-		setState(STATE_RECONNECTING);
-    }
-    
-   /* BroadcastReceiver startReconnectionReciever = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			// TODO Auto-generated method stub
-			String action=intent.getAction();
-			if(action==SensorService.ACTION_START_RECONNECTING)
-			{				
-				IsScheduled=true;
-			   if(equivitalAddress!=null)
-				{									
-				Log.d("SemBluetoothConnection","reconnecting...");
-				if( isConnected()!=true && Count<=10)
-				{
-					     connect(equivitalAddress);
-					     Count++;
-					     
-				}
-				else
-				{
-					SensorService.mAlarmManager.cancel(startReconnection);
-					IsScheduled=false;
-					//startReconnection=null;
-					 if(isConnected()!=true)
-					{						
-						fireConnectionClosedEvent();					
-				        setState(STATE_NONE);
-				       /// SensorService.serviceContext.unregisterReceiver(reconnectionRequestReciever);
-				        Intent i=new Intent(SensorService.ACTION_START_SOUND);
-				        SensorService.serviceContext.sendBroadcast(i);
-					}
-				}
-			}
-			else
-			 {
-				   Log.d("SemBluetoothConnection","A Initial Connection has to be established before reconnecting");
-				   
-			 }
-		  }
-		}
-    	
-    };*/
-    
-    BroadcastReceiver reconnectionRequestReciever = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			// TODO Auto-generated method stub
-			String action=intent.getAction();
-			if(action==SensorService.ACTION_RECONNECT_CHESTSENSOR)
-			{
-			   reconnectDevice();
-			}
-		}
-    	
-    };
-    
-   
-
     private void connectionLost(IOException e)
     {     	
-    	if(timer1==null)
+    	if(reconnectionStarted!=true)
     	{
-    		reconnectDevice();  
-    	}
+    		reconnectDevice();
+    		reconnectionStarted=true;
+        }
     }
 
+    
 
+    public void reconnectDevice()
+    {    	
+    	Count=0;    		    		
+		timer1=new Timer();		
+		Reconnect mReconnectDevice=new Reconnect();
+		timer1.scheduleAtFixedRate(mReconnectDevice,1000,3000);   
+		setState(STATE_RECONNECTING);		
+    }
+					
+		
     public class Reconnect extends TimerTask{
 		@Override
 		public void run() {
@@ -549,19 +486,14 @@ public class SemBluetoothConnection implements ISemConnection
 			}
 			else
 			{
-				if(timer1!=null)
-				{
-				timer1.cancel();
-				}
-				timer1=null;
-				isAttemptSuccessful=false;
+				reconnectionStarted=false;
+				timer1.cancel();								
 				if(isConnected()!=true)
 				{
 					fireConnectionClosedEvent();					
-			        setState(STATE_NONE);
-			       /// SensorService.serviceContext.unregisterReceiver(reconnectionRequestReciever);
+			        setState(STATE_NONE);			      
 			        Intent i=new Intent(SensorService.ACTION_START_SOUND);
-			       SensorService.serviceContext.sendBroadcast(i);
+			        SensorService.serviceContext.sendBroadcast(i);
 				}
 			}
 			

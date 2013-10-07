@@ -10,9 +10,11 @@ import java.util.TimerTask;
 import org.xml.sax.InputSource;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -93,10 +95,11 @@ public class XMLSurveyActivity extends Activity {
      * TODO: Maybe make a private class with LinkedHash/Tree Map + parcelable
      */
     LinkedHashMap<String, List<String>> answerMap;
+    MediaPlayer mp;
     public class StartSound extends TimerTask {
     	@Override    	
     	public void run(){    		
-    	MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.bodysensor_alarm);
+        mp = MediaPlayer.create(getApplicationContext(), R.raw.bodysensor_alarm);
     	mp.start();
     	}
     }
@@ -152,8 +155,9 @@ public class XMLSurveyActivity extends Activity {
 		if(surveyName.equalsIgnoreCase("RANDOM_ASSESSMENT") && surveyFile.equalsIgnoreCase("RandomAssessmentParcel.xml"))
 		{
 			Timer t=new Timer();
-			t.schedule(new  StartSound(),1000*5);
-			
+			t.schedule(new  StartSound(),1000*5);			
+			Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+	        v.vibrate(1000); 
 		}
 		
 		Log.d("XMLSurvey","File Name: "+surveyFile);
@@ -187,7 +191,18 @@ public class XMLSurveyActivity extends Activity {
 		}
     }
     
-    protected ScrollView setupLayout(LinearLayout layout){
+    
+    
+    @Override
+	protected void onPause() {
+		// TODO Auto-generated method stub
+		super.onPause();
+		//mp.release();
+	}
+
+
+
+	protected ScrollView setupLayout(LinearLayout layout){
     	/* Didn't get a layout from nextQuestion(),
     	 * error (shouldn't be possible) or survey complete,
     	 * either way finish safely.
@@ -234,8 +249,7 @@ public class XMLSurveyActivity extends Activity {
     	surveyResultsIntent.putExtra(INTENT_EXTRA_SURVEY_NAME, surveyName);
     	surveyResultsIntent.putExtra(INTENT_EXTRA_SURVEY_RESULTS, answerMap);
     	surveyResultsIntent.putExtra(INTENT_EXTRA_COMPLETION_TIME, System.currentTimeMillis());
-    	this.sendBroadcast(surveyResultsIntent);
-    	
+    	this.sendBroadcast(surveyResultsIntent);    	
     	//Alert user
     	Toast.makeText(this, "Survey Complete.", Toast.LENGTH_LONG).show();
     	

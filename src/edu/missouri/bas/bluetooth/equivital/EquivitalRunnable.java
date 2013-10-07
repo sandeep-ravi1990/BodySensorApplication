@@ -92,7 +92,7 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
 		// TODO Auto-generated method stub
 	    device.addSummaryEventListener(this);	   	
 		device.setSummaryDataEnabled(true);
-		ISemConnection connection = SemBluetoothConnection.createConnection(address);	
+		ISemConnection connection = SemBluetoothConnection.createConnection(address);		
 		device.start(connection);
 	}
 
@@ -148,27 +148,22 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
 		Calendar c=Calendar.getInstance();
 		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 		String dateObj =curFormater.format(c.getTime()); 		
-		String file_name="chestsensor_"+dateObj+".txt";
-		
-		
+		String file_name="chestsensor_"+dateObj+".txt";	
 		Calendar cal=Calendar.getInstance();
-		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
-		
+		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
         File f = new File(BASE_PATH,file_name);		
-		String dataToWrite = String.valueOf(cal.getTime())+","+chestSensorData;
-		/*if(dataPoints.size()!=70)
-        {	   
-        	dataPoints.add(dataToWrite+";");
-        	if(dataPoints.size()==57)
-        	{
+		String dataToWrite = String.valueOf(cal.getTime())+","+chestSensorData;			   
+        dataPoints.add(dataToWrite+";");
+        if(dataPoints.size()==57)
+        {
         	    List<String> subList = dataPoints.subList(0,56);
  	            String data=subList.toString();
- 	           // sendDatatoServer("chestsensor"+dateObj,data);
+ 	            String formattedData=data.replaceAll("[\\[\\]]","");
+ 	            sendDatatoServer("chestsensor"+dateObj,formattedData);
  	            Log.d("Equivital","Data Point Sent");
  	            subList.clear();  
- 	         }	            		            			            	
-        }*/
-		//sendDatatoServer("chestsensor_"+dateObj,dataToWrite);
+ 	            subList=null;
+ 	    } 	
 		if(f != null){
 			try {
 				writeToFile(f, dataToWrite);

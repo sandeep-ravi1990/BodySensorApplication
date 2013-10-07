@@ -36,17 +36,21 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	static int Count=0;
 	static String Temp=null;
 	List<String> dataPoints=new ArrayList<String>();
+	Calendar c=Calendar.getInstance();
+    SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd");
 
 	public InternalSensor(SensorManager sensorManager,int sensorType,int samplingRate)
 	{
-		mSensorManager = sensorManager;
+	    mSensorManager = sensorManager;
 		SensorType=sensorType;
 		SamplingRate=samplingRate;
 	}	
 	
+	
 	@Override
 	public void run() 
 	{  // TODO Auto-generated method stub
+		Log.d("Sensor Number",String.valueOf(SensorType));
 		setup(SensorType,SamplingRate);		
 	}
 
@@ -56,78 +60,68 @@ public class InternalSensor implements Runnable, SensorEventListener {
 		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(sensorType),samplingRate);
 	}
 
+	
+	
 	@Override
 	public void onAccuracyChanged(Sensor sensor, int accuracy) {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public String getDate()
+	{ 
+   		String dateObj =curFormater.format(c.getTime()); 
+   		return dateObj;
+	}
+	
+	public String getTimeStamp()
+	{
+		Calendar cal=Calendar.getInstance();
+   		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));
+		return String.valueOf(cal.getTime());
+	}
 
 	@Override
-	public void onSensorChanged(SensorEvent event) {
-		SensorService mSensorService=new SensorService();			
+	public void onSensorChanged(SensorEvent event) {				
 		// TODO Auto-generated method stub
-		Sensor sensor = event.sensor;
-	    Calendar c=Calendar.getInstance();
-   		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
-   		String dateObj =curFormater.format(c.getTime()); 
-   		Calendar cal=Calendar.getInstance();
-   		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));
-   		
-   		if (sensor.getType() == Sensor.TYPE_ACCELEROMETER) 
+   		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) 
 	      {	
-	    		String Acclerometer_Values = String.valueOf(cal.getTime())+","+event.values[0]+","+event.values[1]+","+event.values[2];
-	    		String file_name="Accelerometer_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            //sendDatatoServer("Accelerometer_"+dateObj,Acclerometer_Values);
+	    		String Accelerometer_Values = getTimeStamp()+","+event.values[0]+","+event.values[1]+","+event.values[2];
+	    		String file_name="Accelerometer_"+getDate()+".txt";
+	            File f = new File(SensorService.BASE_PATH,file_name);	           	   
+                dataPoints.add(Accelerometer_Values+";");
+	            if(dataPoints.size()==80)
+	            {
+	            	    List<String> subList = dataPoints.subList(0,41);
+	     	            String data=subList.toString();	     	            
+	     	            String formatedData=data.replaceAll("[\\[\\]]","");		     	            
+	     	            sendDatatoServer("Accelerometer"+getDate(),formatedData);
+	     	            subList.clear(); 	     	            
+	     	    }
 	    		try {
-					writeToFile(f,Acclerometer_Values);
+					writeToFile(f,Accelerometer_Values);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 	      
 	      }
-   			 else if (sensor.getType() == Sensor.TYPE_LIGHT) 
+   			 else if (event.sensor.getType() == Sensor.TYPE_LIGHT) 
 	        {
 	            //TODO: get values 
    				 
-   				 //Changes screen brightness based on surrounding  light
-   				/*float lux=event.values[0];	        	
-	        	if(lux<500)
-	        	{
-	        		mSensorService.setBrightness(0.3F);
-	        	}
-	        	else if(lux>500 && lux<10000)
-	        	{
-	        		mSensorService.setBrightness(0.6F);			        		
-	        	}
-	        	
-	        	else if(lux>10000 && lux <25000)
-	        	{
-	        		
-	        		mSensorService.setBrightness(0.8F);
-	        	}
-	        	
-	        	else if(lux>25000)
-	        	{
-	        		
-	        		mSensorService.setBrightness(1F);
-	        	}*/
-	        	String LightIntensity= String.valueOf(cal.getTime())+","+event.values[0];
-	        	String file_name="LightSensor_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            if(dataPoints.size()!=100)
-	            {	   
-                       	dataPoints.add(LightIntensity+";");
-	            	if(dataPoints.size()==90)
-	            	{
-	            	    List<String> subList = dataPoints.subList(0,46);
+   				String LightIntensity= getTimeStamp()+","+event.values[0];
+	        	String file_name="LightSensor_"+getDate()+".txt";
+	            File f = new File(SensorService.BASE_PATH,file_name);	              
+                dataPoints.add(LightIntensity+";");
+	            if(dataPoints.size()==80)
+	             {
+	            	    List<String> subList = dataPoints.subList(0,41);
 	     	            String data=subList.toString();	     	            
-	     	            String formatedData=data.replaceAll("[\\[\\]]","");		     	            
-	     	            //sendDatatoServer("LightSensor_18"+dateObj,formatedData);
+	     	            String formattedData=data.replaceAll("[\\[\\]]","");		     	            
+	     	            sendDatatoServer("LightSensor"+getDate(),formattedData);
 	     	            subList.clear();  
-	     	         }	            		            			            	
-	            }
+	     	      }	            
 	    		try {
 					writeToFile(f,LightIntensity);
 				} catch (IOException e) {
@@ -135,21 +129,8 @@ public class InternalSensor implements Runnable, SensorEventListener {
 					e.printStackTrace();
 				}
 	    				        
-	        }
-	        else if(sensor.getType()==Sensor.TYPE_PRESSURE){				        	
-	        	
-	        	String Pressure= String.valueOf(cal.getTime())+","+event.values[0];
-	        	String file_name="PressureSensor_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            //sendDatatoServer("PressureSensor_"+dateObj,Pressure);
-	    		try {
-					writeToFile(f,Pressure);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-	        	
-	        }
+	       }
+	       
 	}
 	
 	protected static void writeToFile(File f, String toWrite) throws IOException{

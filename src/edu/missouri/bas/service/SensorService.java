@@ -88,26 +88,11 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.equivital.sdk.ISemConnection;
+
 import com.equivital.sdk.connection.SemBluetoothConnection;
-import com.equivital.sdk.decoder.BadLicenseException;
 import com.equivital.sdk.decoder.SDKLicense;
-import com.equivital.sdk.decoder.SemCalibrationParameterType;
 import com.equivital.sdk.decoder.SemDevice;
-import com.equivital.sdk.decoder.SemOperatingModeType;
-import com.equivital.sdk.decoder.events.BatteryVoltageEventArgs;
-import com.equivital.sdk.decoder.events.HeartRateEventArgs;
-import com.equivital.sdk.decoder.events.ISemDeviceBatteryEvents;
-import com.equivital.sdk.decoder.events.ISemDeviceBreathingRateEvents;
-import com.equivital.sdk.decoder.events.ISemDeviceHeartRateEvents;
-import com.equivital.sdk.decoder.events.ISemDeviceSummaryEvents;
-import com.equivital.sdk.decoder.events.ISemDeviceTimingEvents;
-import com.equivital.sdk.decoder.events.QualityConfidenceEventArgs;
-import com.equivital.sdk.decoder.events.RRIntervalEventArgs;
-import com.equivital.sdk.decoder.events.RespirationRateEventArgs;
-import com.equivital.sdk.decoder.events.SEMDateTimeDataEventArgs;
-import com.equivital.sdk.decoder.events.SemSummaryDataEventArgs;
-import com.equivital.sdk.decoder.events.SynchronisationTimerEventArgs;
+
 import com.google.android.gms.location.DetectedActivity;
 
 import org.apache.http.HttpResponse;
@@ -121,7 +106,8 @@ import org.apache.http.util.EntityUtils;
 
 
 
-public class SensorService extends Service  implements ISemDeviceSummaryEvents,SensorEventListener {//ISemDeviceHeartRateEvents,ISemDeviceBreathingRateEvents, 
+public class SensorService extends Service 
+{ 
 
     private final String TAG = "SensorService";   
 	/*
@@ -281,7 +267,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	InternalSensor Accelerometer;
 	InternalSensor LightSensor;
 	InternalSensor Pressure;
-	
+	EquivitalRunnable equivitalThread;
 	Notification mainServiceNotification;
 	public static final int SERVICE_NOTIFICATION_ID = 1;
 	
@@ -292,15 +278,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	
 	//Variables for storing chest sensor values
 	
-	double brBeltValue;
-	double brECGValue;
-	double brImpedanceValue;
-	double brConfidence;
-	double brEDRValue;
-	double hrConfidence;
-	double heartRate;
-	String motion;
-	String orientation;
+	
 	
 	ActivityRecognitionScan activityRecognition;
 	DetectionRemover mDetectionRemover;
@@ -337,37 +315,29 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
         soundsMap = new HashMap<Integer, Integer>();
         soundsMap.put(SOUND1, mSoundPool.load(this, R.raw.bodysensor_alarm, 1));
         soundsMap.put(SOUND2, mSoundPool.load(this, R.raw.voice_notification, 1));       
-		//Setup service context
+		
 		serviceContext = this;
-		/*mSound1=new StartSound();
-		mSound2=new StartSound2();*/
-		//Get sensor manager 
+		
 		mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-		/*Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL);
+		Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL);
 		Accelerometer.run();		
 		LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL);
-		LightSensor.run();*/
-		//Pressure=new InternalSensor(mSensorManager,Sensor.TYPE_PRESSURE,SensorManager.SENSOR_DELAY_NORMAL);
-		//Pressure.run();
-		/*mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT), SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE), SensorManager.SENSOR_DELAY_NORMAL);
-		*///Get alarm manager
+		LightSensor.run();
+		
 		mAlarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		
 		//Get location manager
 		mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		
-		/*activityRecognition=new ActivityRecognitionScan(getApplicationContext());
-		activityRecognition.startActivityRecognitionScan();*/
+		activityRecognition=new ActivityRecognitionScan(getApplicationContext());
+		activityRecognition.startActivityRecognitionScan();
 		
 		mPowerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
 		
 		serviceWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SensorServiceLock");
 		serviceWakeLock.acquire();
 		
-		mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-		bluetoothMacAddress = mBluetoothAdapter.getAddress();
+		
 		
 		//Initialize start time
 		stime = System.currentTimeMillis();
@@ -398,27 +368,8 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
                 notifyIntent, Notification.FLAG_ONGOING_EVENT);
         notification.setLatestEventInfo(SensorService.this, getString(R.string.app_name),
         		"Recording service started at: "+cal.getTime().toString(), contentIntent);
-        notificationManager.notify(SensorService.SERVICE_NOTIFICATION_ID, notification);		
-       
-        
-		/*
-		 * Setup IO for recording
-		 */
-		try {
-			prepareIO();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		/*
-		 * Setup location control object
-		 */
-		locationControl = new LocationControl(this, mLocationManager, 1000 * 60, 200,3000);
-		
-		//sensorControl = new SensorControl(mSensorManager, serviceContext, 30000);
-
-
-		//Register for result intents from XML Survey
+        notificationManager.notify(SensorService.SERVICE_NOTIFICATION_ID, notification);
+		locationControl = new LocationControl(this, mLocationManager, 1000 * 60, 200,3000);		
 		IntentFilter activityResultFilter = 
 				new IntentFilter(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS);
 		SensorService.this.registerReceiver(alarmReceiver, activityResultFilter);
@@ -426,21 +377,8 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		IntentFilter sensorDataFilter = 
 				new IntentFilter(SensorService.ACTION_SENSOR_DATA);
 		SensorService.this.registerReceiver(alarmReceiver, sensorDataFilter);
-		
-		/*IntentFilter triggerFilter =
-				new IntentFilter(SensorService.ACTION_TRIGGER_SURVEY);
-		SensorService.this.registerReceiver(alarmReceiver, triggerFilter);*/
-		
 		Log.d(TAG,"Sensor service created.");
 	
-		
-		
-		httpPostRunnable = new HttpPostThread(this, "http://dslsrv8.cs.missouri.edu/BAS/InsertDebug.php");
-		httpPostRunnable.start();
-		httpPostThread = new Thread(httpPostRunnable);
-		httpPostThread.start();
-		
-		
 		try {
 			prepareIO();
 		} catch (IOException e) {
@@ -448,53 +386,12 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			e.printStackTrace();
 		}
 		prepareAlarms();
-		//prepareBluetooth();
-				
-		SDKLicense sdk = SemDevice.getLicense();
-		sdk.applicationName = "Test Harness";
-		sdk.developerName = "Java Version";
-		sdk.licenseCode = "ZAP0Q9FLGo/XwrdBBAtdFk8jK7i/6fXFMzKiaCtC7jNvChtpMoOxSaH7tdqtFkmMbjUaskRyLGFCTGVJdNlrFjfbBjSGng9NGL4pnJ49TRTNR8Zmq0E9wnydpo3Du8RAcBVdGYjTjTctplrJ/cYHPHxOnbY5QuHYkY3dXBF3CSE=";
 		
-		Calendar c=Calendar.getInstance();
-		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
-		String dateObj =curFormater.format(c.getTime()); 		
-		String file_name="Mac_Address"+dateObj+".txt";
-		String Path = Environment.getExternalStorageDirectory().getPath() + "/TestResults/"+file_name;
-		File file = new File(Path);
-		String address =  null;
-		if(file.exists())
-		{
-			BufferedReader br;
-			try {
-				br = new BufferedReader(new FileReader(Path));
-				StringBuilder sb = new StringBuilder();
-				String SCurrentLine = "";
-		        while ((SCurrentLine = br.readLine()) != null) 
-		        {		            
-		            address = SCurrentLine;
-		        }
-		        if(!(address.equals(null)))
-		        {
-		        Intent i = new Intent();
-		        i.setClass(this, SensorConnections.class);
-		        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startActivity(i);
-				Timer connectionTimer=new Timer();
-				connectionTimer.schedule(new ConnectSensor(address),1000*3);
-		        //EquivitalRunnable equivitalThread=new EquivitalRunnable(address);
-				//equivitalThread.run();
-		        }
 				
-			} 		    
-		     catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}		
 		
 		Intent scheduleCheckConnection = new Intent(SensorService.ACTION_SCHEDULE_CHECK);
 		scheduleCheck = PendingIntent.getBroadcast(serviceContext, 0, scheduleCheckConnection , 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*1,1000*60*1,scheduleCheck);
+		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*5,1000*60*5,scheduleCheck);
 		
 	   }
 	
@@ -504,8 +401,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	public int onStartCommand(Intent intent, int flags, int startId) 
 	{
 		// TODO Auto-generated method stub	
-		this.startForeground(SensorService.SERVICE_NOTIFICATION_ID, notification);
-		return START_REDELIVER_INTENT;
+		return START_NOT_STICKY;
 	}
 
 
@@ -517,30 +413,43 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			// TODO Auto-generated method stub
 			String action = intent.getAction();
 			//Log.d(TAG, "Check Request Recieved");
+			int state=SemBluetoothConnection.getState();
+			
 			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){
-				int state=SemBluetoothConnection.getState();			
 				if(state==0 || state==1)
-				{				
-					File f=new File(BASE_PATH,"ConnectionAttempts.txt");
-					Calendar cal=Calendar.getInstance();
-			   		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));
-					try {
-						writeToFile(f,String.valueOf(cal.getTime())+" "+String.valueOf(reconnectionAttempts)+" "+SemBluetoothConnection.equivitalAddress);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					reconnectionAttempts++;
-					Intent i=new Intent(SensorService.ACTION_RECONNECT_CHESTSENSOR);
-					serviceContext.sendBroadcast(i);
-				}
-				
-				/*ActivityManager activityManager = (ActivityManager)serviceContext.getSystemService(ACTIVITY_SERVICE);
+				{
+					Intent connectionIntent = new Intent();
+			        connectionIntent.setClass(serviceContext, SensorConnections.class);
+			        connectionIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					startActivity(connectionIntent);
+					Intent i=new Intent(SensorService.ACTION_START_SOUND);
+			        SensorService.serviceContext.sendBroadcast(i);			        
+				}							
 				Runtime info = Runtime.getRuntime();
 			    long freeSize = info.freeMemory();
-		        long totalSize= info.totalMemory();
+		        long totalSize= info.totalMemory();		        
 		        long usedSize = totalSize - freeSize;
-				Log.d(TAG,String.valueOf(usedSize/1024)+"/"+String.valueOf(totalSize/1024));*/
+		        double temp=freeSize/(double)totalSize;
+		        DecimalFormat percentFormat= new DecimalFormat("#.#%");
+		        Calendar c=Calendar.getInstance();
+				SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
+				String dateObj =curFormater.format(c.getTime()); 		
+				String file_name="memory_usage_SensorService3"+dateObj+".txt";
+				Calendar cal=Calendar.getInstance();
+				cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
+				
+		        File f = new File(BASE_PATH,file_name);		
+				String dataToWrite = String.valueOf(cal.getTime())+","+String.valueOf(usedSize/1024)+","+String.valueOf(totalSize/1024)+","+String.valueOf(freeSize/1024)+","+String.valueOf(percentFormat.format(temp));
+				
+				if(f != null){
+					try {
+						writeToFile(f, dataToWrite);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}				
+					
+				}	
+				
 				
 			}
 		}
@@ -612,28 +521,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		 
 		  
 	 }
-	/*public class StartSound extends TimerTask
-	{
-		@Override
-		public void run() {			
-			// TODO Auto-generated method stub
-			//MediaPlayer.create(serviceContext, R.raw.bodysensor_alarm).start();
-			playSound(1,1.0f);
-			Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-	        v.vibrate(1000);        
-	        
-		}	
-	}
-	
-	public class StartSound2 extends TimerTask
-	{
-		@Override
-		public void run() {
-			// TODO Auto-generated method stub
-			playSound(2,1.0f);
-		}	
-	}*/
-	
 	
 	public void playSound(int sound, float fSpeed) {
         AudioManager mgr = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
@@ -645,36 +532,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 
 
 	private void prepareAlarms(){
-		//Intent schedulePicture = new Intent(SensorService.ACTION_SCHEDULE_PICTURE);
-		//Intent scheduleAudio = new Intent(SensorService.ACTION_SCHEDULE_AUDIO);
-		//Intent scheduleTranscription = new Intent(SensorService.ACTION_SCHEDULE_TRANSCRIPTION);
-		Random rand = new Random(System.currentTimeMillis());
-		Intent scheduleSurveyIntent = 
-				new Intent(SensorService.ACTION_SCHEDULE_SURVEY);
-		scheduleSurvey = PendingIntent.getBroadcast(
-				serviceContext, 0, scheduleSurveyIntent, 0);
-		long randomTime = 60+rand.nextInt(60);
-		//randomTime = 1;
-		mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime() + 1000 + (1000 * 60 * randomTime), scheduleSurvey);
-		
-		/*Intent scheduleSensorIntent = 
-				new Intent(SensorService.ACTION_SCHEDULE_SENSOR);
-		scheduleSensor = PendingIntent.getBroadcast(
-				serviceContext, 0, scheduleSensorIntent, 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime() + 10000, 1000 * 31, scheduleSensor);*/
-		
-		/*Intent scheduleLocationIntent = new Intent(SensorService.ACTION_SCHEDULE_LOCATION);
-		scheduleLocation = PendingIntent.getBroadcast(
-				serviceContext, 0, scheduleLocationIntent, 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime() + 10000, 1000 * 60 * 5, scheduleLocation);*/
-		
-		IntentFilter sensorSchedulerFilter = 
-				new IntentFilter(ACTION_SCHEDULE_SENSOR);
-		IntentFilter surveySchedulerFilter = 
-				new IntentFilter(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS);
 		IntentFilter locationSchedulerFilter =
 				new IntentFilter(ACTION_SCHEDULE_LOCATION);
 		IntentFilter locationInterruptSchedulerFilter =
@@ -684,18 +541,14 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		IntentFilter surveyTest =
 				new IntentFilter("ACTION_SURVEY_TEST");
 
-		IntentFilter bluetoothConnect = new IntentFilter(ACTION_CONNECT_BLUETOOTH);		
-		IntentFilter bluetoothDisconnect = new IntentFilter(ACTION_DISCONNECT_BLUETOOTH);
-		IntentFilter bluetoothUpdate = new IntentFilter(ACTION_GET_BLUETOOTH_STATE);
+		
 		IntentFilter soundRequest=new IntentFilter(ACTION_START_SOUND);
 		IntentFilter checkRequest=new IntentFilter(ACTION_SCHEDULE_CHECK);
 		IntentFilter locationFoundFilter = new IntentFilter(LocationControl.INTENT_ACTION_LOCATION);
 		IntentFilter sound1=new IntentFilter(ACTION_TRIGGER_SOUND);
 		IntentFilter sound2=new IntentFilter(ACTION_TRIGGER_SOUND2);
-		//SensorService.this.registerReceiver(alarmReceiver, sensorSchedulerFilter);
-		//SensorService.this.registerReceiver(alarmReceiver, surveySchedulerFilter);
-		SensorService.this.registerReceiver(alarmReceiver, locationSchedulerFilter);
 		SensorService.this.registerReceiver(alarmReceiver, locationFoundFilter);
+		SensorService.this.registerReceiver(alarmReceiver, locationSchedulerFilter);		
 		SensorService.this.registerReceiver(alarmReceiver, locationInterruptSchedulerFilter);
 		SensorService.this.registerReceiver(alarmReceiver, surveyScheduleFilter);
 		SensorService.this.registerReceiver(alarmReceiver, surveyTest);
@@ -703,14 +556,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		SensorService.this.registerReceiver(soundRequestReceiver,sound1);
 		SensorService.this.registerReceiver(soundRequestReceiver,sound2);
 		SensorService.this.registerReceiver(checkRequestReceiver,checkRequest);
-		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothConnect);		
-		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothDisconnect);
-		SensorService.this.registerReceiver(bluetoothReceiver, bluetoothUpdate);
-		
-		
-		
-		/*Chest Sensor Intent Filter*/
-		
 		IntentFilter chestSensorData = new IntentFilter(ACTION_CONNECT_CHEST);
 		SensorService.this.registerReceiver(chestSensorReceiver,chestSensorData);
 		}
@@ -754,25 +599,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		File DIR = new File(BASE_PATH);
 		if(!DIR.exists())
 			DIR.mkdir();
-
-		for(String key: surveyNames){
-			surveyFiles.put(key, BASE_PATH + key.toLowerCase() + ".txt");
-		}
-		/*
-		 * Open files that will be used for various tasks and
-		 * for battery level recordings
-		 */
-		//sensorFile = new File(BASE_PATH+sensorFileName);
-			
-		
-		
-		/*
-		 * Open streams for recording battery information,
-		 * other tasks will be responsible for open their own
-		 * streams.
-		 */
-		//fileWriterSensor = new FileWriter(audioFile, true);
-		//bufferedWriterSensor = new BufferedWriter(fileWriterSensor);
 		
 		Log.d(TAG,"IO Prepared");
 	}
@@ -784,9 +610,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 	 */
 	@Override
 	public void onDestroy(){
-		//locationControl.cancel();
-		//sensorControl.cancel();
-		//SensorThread.stopRecording();
+	
 		
 		File f = new File(BASE_PATH,"SensorServiceEvents.txt");
 		Calendar cal=Calendar.getInstance();
@@ -795,17 +619,8 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
-		}	
+		}			
 		
-		httpPostRunnable.stop();
-		
-		try {
-			httpPostThread.interrupt();
-			httpPostThread.join();
-			
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
 		
 		if(affectivaRunnable != null){
 			affectivaRunnable.stop();
@@ -818,23 +633,21 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		
 		notificationManager.cancel(SensorService.SERVICE_NOTIFICATION_ID);
 		
-		SensorService.this.unregisterReceiver(alarmReceiver);
-		SensorService.this.unregisterReceiver(bluetoothReceiver);
+		SensorService.this.unregisterReceiver(alarmReceiver);		
 		SensorService.this.unregisterReceiver(chestSensorReceiver);
 		SensorService.this.unregisterReceiver(soundRequestReceiver);
 		SensorService.this.unregisterReceiver(checkRequestReceiver);
-		mSensorManager.unregisterListener(this);
+		
 		mAlarmManager.cancel(scheduleSurvey);
 		mAlarmManager.cancel(scheduleSensor);
 		mAlarmManager.cancel(scheduleLocation);	
 		mAlarmManager.cancel(scheduleCheck);
 		mAlarmManager.cancel(triggerSound);
 		mAlarmManager.cancel(triggerSound2);
-		/*activityRecognition.stopActivityRecognitionScan();
+		
+		activityRecognition.stopActivityRecognitionScan();
 		Accelerometer.stop();
-		LightSensor.stop();*/
-		//Pressure.stop();
-		//mAlarmManager.cancel(surveyIntent);
+		LightSensor.stop();
 		
 		serviceWakeLock.release();
 		CancelTimers();
@@ -848,87 +661,15 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		}
 	}
 		
-	public static void requestLocationUpdates()
-	{
-		if(IsRetrievingUpdates!=true)
-		{
-		Intent scheduleLocationIntent = new Intent(SensorService.ACTION_SCHEDULE_LOCATION);
-		scheduleLocation = PendingIntent.getBroadcast(serviceContext, 0, scheduleLocationIntent, 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,0, 1000 * 60, scheduleLocation);
-		}
-	}
 	
-	public static void stopLocationUpdates()
-	{
-		if(IsRetrievingUpdates!=false)
-		{
-		Intent locationIntent = new Intent(SensorService.ACTION_STOP_LOCATIONCONTROL);
-	    serviceContext.sendBroadcast(locationIntent);
-	    mAlarmManager.cancel(scheduleLocation);	
-		}
-	}
-	
-	public static void setStatusLocationUpdates(boolean status)
-	{
-		IsRetrievingUpdates=status;
-	}
-	
-	public boolean getStatusLocationUpdates()
-	{
-	     return IsRetrievingUpdates;
-	}
-	
-	public static  void setCurrentUserActivity(int Activity,int Confidence)
-	{
-		currentUserActivity=Activity;
-		switch (currentUserActivity) {
-		case DetectedActivity.IN_VEHICLE:		
-		case DetectedActivity.ON_BICYCLE:		
-		case DetectedActivity.ON_FOOT:
-			if(Confidence>=75)
-			{
-			   requestLocationUpdates();
-			   setStatusLocationUpdates(true);
-			}
-		case DetectedActivity.TILTING:				
-		case DetectedActivity.STILL:
-	    case DetectedActivity.UNKNOWN:
-			if(Confidence>=75)
-			{
-				stopLocationUpdates();
-				setStatusLocationUpdates(false);
-			}
-		
-		default:
-			  //stopLocationUpdates();
-      }
-		
-	}
 	
 	BroadcastReceiver alarmReceiver = new BroadcastReceiver() {
+		@SuppressWarnings("deprecation")
 		@Override
 		public void onReceive(Context context, Intent intent) {
 			String action = intent.getAction();
-			if(action.equals(SensorService.ACTION_SCHEDULE_SENSOR)){
-				Log.d(TAG,"Received alarm event - schedule sensor");
-				//sensorControl.startRecording(); 
-				
-			}			
-			else if(action.equals(SensorService.ACTION_SENSOR_DATA)){
-				/*Log.d(TAG,"Sensor Data Received");
-				HashMap<String, String> sensorMap =
-						new HashMap<String, String>();
-				double[] avg = intent.getDoubleArrayExtra(SensorControl.SENSOR_AVERAGE);
-				
-				sensorMap.put("xVal", avg[0]+"");
-	
-				sensorMap.put("yVal", avg[1]+"");	
-
-				sensorMap.put("zVal", avg[2]+"");
-				List<NameValuePair> pairs = parseAssocToList(sensorMap);
-				httpPostRunnable.post(new HttpPostRequest("", "PHONE_ACCELEROMETER", pairs));*/
-			}
-			else if(action.equals(SensorService.ACTION_STOP_LOCATIONCONTROL)){
+			
+		  if(action.equals(SensorService.ACTION_STOP_LOCATIONCONTROL)){
 				Log.d(TAG,"Stoping Location Upates");
 				locationControl.cancel();
 			}
@@ -936,28 +677,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 				Log.d(TAG,"Received alarm event - schedule location");
 				locationControl.startRecording();
 			}
-			else if(action.equals(LocationControl.INTENT_ACTION_LOCATION)){
-				Log.d(TAG,"Received alarm event - location found");
-				Location foundLocation = 
-						intent.getParcelableExtra(LocationControl.LOCATION_INTENT_KEY);
-
-				if(foundLocation != null){
-					HashMap<String, String> locationMap = 
-							new HashMap<String, String>();
-					
-					locationMap.put("accuracy", foundLocation.getAccuracy()+"");
-					
-					locationMap.put("longi", foundLocation.getLongitude()+"");
-					
-					locationMap.put("lat", foundLocation.getLatitude()+"");			
-					
-					locationMap.put("source", foundLocation.getProvider());	
-					
-					writeLocationToFile(foundLocation);
-					List<NameValuePair> pairs = parseAssocToList(locationMap);
-					httpPostRunnable.post(new HttpPostRequest("", "LOCATION", pairs));
-				}
-			}
+			
 			else if(action.equals(SensorService.ACTION_SCHEDULE_SURVEY))
 			{
 							Log.d(TAG,"Received alarm event - schedule survey");								
@@ -998,6 +718,27 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 							setStatus(true);
 			}
 			
+			else if(action.equals(LocationControl.INTENT_ACTION_LOCATION)){
+				Log.d(TAG,"Received alarm event - location found");
+				Location foundLocation = 
+						intent.getParcelableExtra(LocationControl.LOCATION_INTENT_KEY);
+
+				if(foundLocation != null){
+					HashMap<String, String> locationMap = 
+							new HashMap<String, String>();
+					
+					locationMap.put("accuracy", foundLocation.getAccuracy()+"");
+					
+					locationMap.put("longi", foundLocation.getLongitude()+"");
+					
+					locationMap.put("lat", foundLocation.getLatitude()+"");			
+					
+					locationMap.put("source", foundLocation.getProvider());	
+					
+					writeLocationToFile(foundLocation);
+					
+				}
+			}
 			else if (action.equals(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS)){
 				Log.d(TAG,"Got survey results");
 				Calendar cal = Calendar.getInstance();
@@ -1017,22 +758,12 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 					Log.e(TAG,"ERROR: Failed to write survey to file!");
 				}
 				Log.d(TAG,"Done writing file");
-				List<NameValuePair> pairs = parseMapToList(results);
-				httpPostRunnable.post(new HttpPostRequest("", surveyName, pairs));
+				
 			}
 		}
 	};
 	
-   public void setBrightness(float value)
-   {		
-	   int brightnessInt=(int)(value*255);
-	   Settings.System.putInt(getContentResolver(),
-			   Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
-			   Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, brightnessInt);
-   }
-   
-
-	
+  
 	public static void CancelTimers()
 	{
 		if(t1!=null&&t2!=null&&t3!=null&&t4!=null&&t5!=null&&t6!=null&&mTimer!=null)
@@ -1076,7 +807,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
 		toWrite = String.valueOf(cal.getTime())+","+
 			l.getLatitude()+","+l.getLongitude()+","+
-			l.getAccuracy()+","+l.getProvider()+","+getNameFromType(currentUserActivity);
+			l.getAccuracy()+","+l.getProvider();//+","+getNameFromType(currentUserActivity);
 		if(f != null){
 			try {
 				writeToFile(f, toWrite);
@@ -1087,7 +818,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		}		
 	}
 	
-	private String getNameFromType(int activityType) {
+	/*private String getNameFromType(int activityType) {
         switch(activityType) {
             case DetectedActivity.IN_VEHICLE:
                 return "in_vehicle";
@@ -1104,7 +835,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
                 
         }
         return "unknown";
-    }
+    }*/
 	
 	
 	protected void writeSurveyToFile(String surveyName, 
@@ -1153,260 +884,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		fw.close();
 	}
 	
-	
-	
-	
-	
-	
-	protected List<NameValuePair> parseMapToList(HashMap<String, List<String>> map){
-		Calendar cal = Calendar.getInstance();
-		cal.setTimeInMillis(System.currentTimeMillis());
-		List<NameValuePair> result = new ArrayList<NameValuePair>();
-		for(Map.Entry<String, List<String>> entry: map.entrySet()){
-			List<String> temp = entry.getValue();
-			if(temp == null){
-				result.add(new BasicNameValuePair(entry.getKey(),""));
-			}
-			else{
-				StringBuilder sb = new StringBuilder(10);
-				for(int i = 0; i < temp.size(); i++){
-					if(i != 0) sb.append(",");
-					sb.append(entry.getValue().get(i));
-				}
-				result.add(new BasicNameValuePair(entry.getKey(),sb.toString()));
-			}
-		}
-		result.add(new BasicNameValuePair("timestamp",cal.getTime().toString()));
-		result.add(new BasicNameValuePair("userid",bluetoothMacAddress));
-		return result;
-		
-	}
-	
-	protected List<NameValuePair> parseAssocToList(HashMap<String, String> map){
-		Calendar cal = Calendar.getInstance();
-		cal.setTimeInMillis(System.currentTimeMillis());
-		List<NameValuePair> result = new ArrayList<NameValuePair>();
-		for(Map.Entry<String, String> entry: map.entrySet()){
-			String temp = entry.getValue();
-			if(temp == null){
-				Log.d(TAG,"Value was skipped: "+entry.getKey());
-				result.add(new BasicNameValuePair(entry.getKey(),""));
-			}
-			else{
-				result.add(
-						new BasicNameValuePair(entry.getKey(), entry.getValue()));
-			}
-		}
-		result.add(new BasicNameValuePair("timestamp",cal.getTime().toString()));
-		result.add(new BasicNameValuePair("userid",bluetoothMacAddress));		
-		return result;
-	}
-
-//------------------------------------------Wrist Sensor Code Starts From Here ------------------------------------------------------
-
-	BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			String action = intent.getAction();
-			if(action.equals(SensorService.ACTION_CONNECT_BLUETOOTH)){
-				if(affectivaRunnable != null &&
-						(affectivaRunnable.getState() == BluetoothRunnable.BluetoothState.CONNECTED
-						|| affectivaRunnable.getState() == BluetoothRunnable.BluetoothState.CONNECTING)){
-					
-				}
-				else{
-					/* Handler = null
-					 * device = from intent
-					 * uuid = from intent
-					 * mode = from intent
-					 * bluetoothsockettype = from intent
-					 * file = null
-					 */
-					String deviceAdr = intent.getStringExtra(INTENT_EXTRA_BT_DEVICE);
-					String uuidRaw = intent.getStringExtra(INTENT_EXTRA_BT_UUID);
-					UUID uuid = UUID.fromString(uuidRaw);
-					int mode = intent.getIntExtra(INTENT_EXTRA_BT_MODE, 1);
-					int type = intent.getIntExtra(INTENT_EXTRA_BT_TYPE, 1);
-					BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceAdr);
-					affectivaRunnable = new AffectivaRunnable(mHandler, device, uuid, mode, type, null);
-					bluetoothThread = new Thread(affectivaRunnable);
-					bluetoothThread.start();
-				}
-			}
-			else if(action.equals(SensorService.ACTION_DISCONNECT_BLUETOOTH)){
-				Intent i = new Intent(ACTION_BLUETOOTH_RESULT);
-				if(affectivaRunnable != null &&
-						(affectivaRunnable.getState() == BluetoothRunnable.BluetoothState.CONNECTED
-						|| affectivaRunnable.getState() == BluetoothRunnable.BluetoothState.CONNECTING )){
-					affectivaRunnable.stop();
-					try {
-						bluetoothThread.join();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-					i.putExtra(INTENT_EXTRA_BT_RESULT, true);
-				}
-				else{
-					i.putExtra(INTENT_EXTRA_BT_RESULT, false);
-				}
-				serviceContext.sendBroadcast(i);
-				
-			}
-			else if(action.equals(SensorService.ACTION_GET_BLUETOOTH_STATE)){
-				if(affectivaRunnable != null){
-					Intent i = new Intent(ACTION_BLUETOOTH_STATE_RESULT);
-					if(affectivaRunnable != null){ 
-						Log.d(TAG,"Bluetooth state is: "+affectivaRunnable.getState());
-						
-						Bundle b = affectivaRunnable.getStateBundle();
-						String deviceAddress = b.getString(BluetoothRunnable.KEY_DEVICE_ADDRESS);
-						String deviceName = b.getString(BluetoothRunnable.KEY_DEVICE_NAME);
-						int newState = b.getInt(BluetoothRunnable.KEY_OLD_STATE);
-						String newStateString = null;
-						
-						switch(newState) {
-							case BluetoothRunnable.BluetoothState.CONNECTED:
-								newStateString = "Connected to: "+deviceName;
-								break;
-							case BluetoothRunnable.BluetoothState.CONNECTING:
-								newStateString = "Attempting to connect to: "+deviceName;
-								break;
-							case BluetoothRunnable.BluetoothState.FAILED:
-								newStateString = "Failed to connect";
-								break;
-							case BluetoothRunnable.BluetoothState.FINISHING:
-								newStateString = "Connection finishing";
-								break;
-							case BluetoothRunnable.BluetoothState.LISTENING:
-								newStateString = "Listening for a connection";
-								break;
-							case BluetoothRunnable.BluetoothState.NONE:
-								newStateString = "Not connected to any device";
-								break;
-							case BluetoothRunnable.BluetoothState.STOPPED:
-								newStateString = "Bluetooth thread was stopped";
-								break;
-							default: newStateString = "Invalid state: "+
-												newState+", something went wrong";
-								break;
-						}	
-						
-						i.putExtra(INTENT_EXTRA_BT_STATE, newStateString);
-						i.putExtra(SensorService.INTENT_EXTRA_BT_DEVICE_NAME, deviceName);
-						i.putExtra(SensorService.INTENT_EXTRA_BT_DEVICE_ADDRESS, deviceAddress);
-					}
-					else
-						i.putExtra(INTENT_EXTRA_BT_STATE, BluetoothRunnable.BluetoothState.NONE);
-					serviceContext.sendBroadcast(i);
-				}
-			}
-		}
-	};
-	
-	Handler mHandler = new Handler(){
-		@Override
-		public void handleMessage(Message msg){
-			if(msg.what != MESSAGE_BLUETOOTH_DATA){
-				Log.d(TAG,"Got message: "+msg.what);
-			}
-			if(msg.what == MESSAGE_BLUETOOTH_DATA){
-				AffectivaPacket p = (AffectivaPacket) msg.obj;
-				handleBluetooth(p);
-			}
-			else if(msg.what == BluetoothRunnable.MessageCode.DISCONNECTED){
-				Intent i=new Intent();
-				
-				BluetoothDevice device = (BluetoothDevice) msg.obj;
-				Toast.makeText(serviceContext, "Lost connection to device: "+device.getName(),
-						Toast.LENGTH_LONG).show();
-				Vibrator vibrator = 
-					(Vibrator) serviceContext.getSystemService(Context.VIBRATOR_SERVICE);
-				vibrator.vibrate(500);
-			}
-			else if(msg.what == BluetoothRunnable.MessageCode.STATE_CHANGED){
-				Log.d(TAG,"State changed handled");
-				Bundle b = (Bundle) msg.obj;
-				String deviceAddress = b.getString(BluetoothRunnable.KEY_DEVICE_ADDRESS);
-				String deviceName = b.getString(BluetoothRunnable.KEY_DEVICE_NAME);
-				String oldState = b.getString(BluetoothRunnable.KEY_OLD_STATE);
-				int newState = b.getInt(BluetoothRunnable.KEY_NEW_STATE);
-				String newStateString = null;
-				
-				switch(newState) {
-					case BluetoothRunnable.BluetoothState.CONNECTED:
-						newStateString = "Connected to: "+deviceName;	
-						Intent h=new Intent("statechange");
-						h.putExtra("State_Change",newStateString);
-						serviceContext.sendBroadcast(h);
-						break;
-					case BluetoothRunnable.BluetoothState.CONNECTING:
-						newStateString = "Attempting to connect to: "+deviceName;						
-						break;
-					case BluetoothRunnable.BluetoothState.FAILED:
-						newStateString = "Failed to connect";
-						break;
-					case BluetoothRunnable.BluetoothState.FINISHING:
-						newStateString = "Connection finishing";
-						break;
-					case BluetoothRunnable.BluetoothState.LISTENING:
-						newStateString = "Listening for a connection";
-						break;
-					case BluetoothRunnable.BluetoothState.NONE:
-						newStateString = "Not connected to any device";
-						break;
-					case BluetoothRunnable.BluetoothState.STOPPED:
-						newStateString = "Bluetooth thread was stopped";
-						break;
-					default: newStateString = "Invalid state: "+
-						newState+", something went wrong";
-						break;
-				}	
-				
-				handleBluetoothStateChange(deviceAddress, deviceName, newStateString);
-			}
-
-		}
-		
-		private void handleBluetooth(AffectivaPacket p){
-			HashMap<String, String> bluetoothMap = 
-				new HashMap<String, String>();
-			bluetoothMap.put("accel_x", p.getAccelerometer().getX()+"");
-			bluetoothMap.put("accel_y", p.getAccelerometer().getY()+"");
-			bluetoothMap.put("accel_z", p.getAccelerometer().getZ()+"");
-
-			bluetoothMap.put("temp", p.getTemperature()+"");
-			bluetoothMap.put("battery", p.getBattery()+"");
-			
-			bluetoothMap.put("eda", p.getEda()+"");
-			bluetoothMap.put("seq_num", p.getSequenceNum());
-	
-			List<NameValuePair> pairs = parseAssocToList(bluetoothMap);
-			httpPostRunnable.post(new HttpPostRequest("", "AFFECTIVA_SENSOR", pairs));
-		}
-
-		
-		private void handleBluetoothStateChange(String deviceAddress, String deviceName, String newState){
-			
-			if(affectivaRunnable != null)
-			{
-				Intent i = new Intent(ACTION_BLUETOOTH_STATE_RESULT);
-				if(affectivaRunnable != null)
-				{ 
-					i.putExtra(INTENT_EXTRA_BT_STATE, newState);
-					i.putExtra(SensorService.INTENT_EXTRA_BT_DEVICE_NAME, deviceName);
-					i.putExtra(SensorService.INTENT_EXTRA_BT_DEVICE_ADDRESS, deviceAddress);
-					Log.d(TAG,"Sending state change");
-				}
-				else
-				{
-					i.putExtra(INTENT_EXTRA_BT_STATE, BluetoothRunnable.BluetoothState.NONE);
-				}
-				
-				serviceContext.sendBroadcast(i);
-			}
-		}
-	};
-	
 //------------------------------------------Chest Sensor Code Starts From Here ------------------------------------------------------
 	
 	BroadcastReceiver chestSensorReceiver = new BroadcastReceiver() {
@@ -1415,28 +892,13 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			String action = intent.getAction();
 			if(action.equals(SensorService.ACTION_CONNECT_CHEST)){
 				Toast.makeText(getApplicationContext(),"Intent Received",Toast.LENGTH_LONG).show();
-				String address=intent.getStringExtra(KEY_ADDRESS);				
-				
-				/*try
-				{
-					device = new SemDevice();
-					device.setSummaryDataEnabled(true);
-				} 
-				catch (BadLicenseException e1)
-				{
-					Toast.makeText(getApplicationContext(),"ERROR:License Code and Developer Name don't match",Toast.LENGTH_LONG).show();
-					return;
-				}*/		
-				EquivitalRunnable equivitalThread=new EquivitalRunnable(address);
+				String address=intent.getStringExtra(KEY_ADDRESS);
+				equivitalThread=new EquivitalRunnable(address);
 				equivitalThread.run();
 				Calendar c=Calendar.getInstance();
 				SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 				String dateObj =curFormater.format(c.getTime()); 		
-				String file_name="Mac_Address"+dateObj+".txt";			
-				
-				Calendar cal=Calendar.getInstance();
-				cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
-				
+				String file_name="Mac_Address"+dateObj+".txt";
 		        File f = new File(BASE_PATH,file_name);		
 				
 				if(f != null){
@@ -1455,91 +917,7 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 		
 	};
 
-	private void connectToDevice(String address) 
-	{
-		Toast.makeText(getApplicationContext(), "Trying to connect to the device",Toast.LENGTH_LONG).show();
-	   	Log.d(TAG,"Entered connectToDevice Method");
-		// TODO Auto-generated method stub
-	    device.addSummaryEventListener(this);	   	
-		device.setSummaryDataEnabled(true);
-		ISemConnection connection = SemBluetoothConnection.createConnection(address);	
-		device.start(connection);
-	}
-
-	@Override
-	public void summaryDataUpdated(SemDevice arg0, SemSummaryDataEventArgs arg1) {
-		// TODO Auto-generated method stub
-		updateSummary(arg1.getSummary().getMotion().name(),arg1.getSummary().getOrientation().name(),
-				arg1.getSummary().getBreathingRate().getBeltSensorRate(),
-				arg1.getSummary().getBreathingRate().getEcgDerivedRate(),arg1.getSummary().getBreathingRate().getImpedanceRate(),
-				arg1.getSummary().getHeartRate().getEcgRate(),arg1.getSummary().getQualityConfidence().getBeltQuality(),
-				arg1.getSummary().getQualityConfidence().getECGQuality(),
-				arg1.getSummary().getQualityConfidence().getImpedanceQuality(),
-				arg1.getSummary().getQualityConfidence().getHeartRateConfidence(),
-				arg1.getSummary().getQualityConfidence().getBreathingRateConfidence(),arg1.getSummary().getGalvanicSkinResistance());
-		
-	}
-
-	private void updateSummary(String motion, String bodyPosition,
-			double beltSensorRate, double ecgDerivedRate, double impedanceRate,
-			double ecgRate, double beltQuality, double ecgQuality,
-			double impedanceQuality, double heartRateConfidence,
-			double breathingRateConfidence,double GSR) {
-		// TODO Auto-generated method stub
-		 String dataFromChestSensor=motion+","+bodyPosition+","+String.valueOf(beltSensorRate)+","+String.valueOf(ecgDerivedRate)+","+
-				 String.valueOf(impedanceRate)+","+String.valueOf(ecgRate)+","+String.valueOf(beltQuality)+","+String.valueOf(ecgQuality)+","+
-				 String.valueOf(impedanceQuality)+","+String.valueOf(heartRateConfidence)+","+String.valueOf(breathingRateConfidence)+","+String.valueOf(GSR);	
-		 Message msgData=new Message();
-		 msgData.what = CHEST_SENSOR_DATA;
-		 Bundle dataBundle = new Bundle();
-		 dataBundle.putString("DATA",dataFromChestSensor);
-		 msgData.obj=dataBundle;
-		 chestSensorDataHandler.sendMessage(msgData);
-	}
 	
-	Handler chestSensorDataHandler = new Handler(){
-		@Override
-		public void handleMessage(Message msg){
-			if(msg.what==CHEST_SENSOR_DATA)
-			{
-				Bundle resBundle =  (Bundle)msg.obj;
-				writeChestSensorDatatoCSV(String.valueOf(resBundle.getString("DATA")));
-				
-			}
-			
-		}
-		
-	};
-
-	private void writeChestSensorDatatoCSV(String chestSensorData) {
-		// TODO Auto-generated method stub
-		//Toast.makeText(serviceContext,"Trying to write to the file",Toast.LENGTH_LONG).show();
-		Calendar c=Calendar.getInstance();
-		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
-		String dateObj =curFormater.format(c.getTime()); 		
-		String file_name="chestsensor_"+dateObj+".txt";
-		
-		
-		Calendar cal=Calendar.getInstance();
-		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
-		
-        File f = new File(BASE_PATH,file_name);		
-		String dataToWrite = String.valueOf(cal.getTime())+","+chestSensorData;
-		sendDatatoServer("chestsensor_"+dateObj,dataToWrite);
-		if(f != null){
-			try {
-				writeToFile(f, dataToWrite);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-					
-			
-		}	
-		
-		
-		
-	}
-
 
 //---------------------------------------Code to upload data to the server----------------------------------------------//
 	
@@ -1589,91 +967,6 @@ public class SensorService extends Service  implements ISemDeviceSummaryEvents,S
 			return false;
 		}
 
-	@Override
-	public void onAccuracyChanged(Sensor sensor, int accuracy) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onSensorChanged(SensorEvent event) {
-		// TODO Auto-generated method stub
-		
-		Sensor sensor = event.sensor;
-	    Calendar c=Calendar.getInstance();
-   		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
-   		String dateObj =curFormater.format(c.getTime()); 
-   		Calendar cal=Calendar.getInstance();
-   		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));
-   		
-   		if (sensor.getType() == Sensor.TYPE_ACCELEROMETER) 
-	      {	
-	    		String Acclerometer_Values = String.valueOf(cal.getTime())+","+event.values[0]+","+event.values[1]+","+event.values[2];
-	    		String file_name="Accelerometer_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            //sendDatatoServer("Accelerometer_"+dateObj,Acclerometer_Values);
-	    		try {
-					writeToFile(f,Acclerometer_Values);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-	      
-	      }
-   			 else if (sensor.getType() == Sensor.TYPE_LIGHT) 
-	        {
-	            //TODO: get values 
-   				 
-   				 //Changes screen brightness based on surrounding  light
-   				float lux=event.values[0];	        	
-	        	if(lux<500)
-	        	{
-	        		setBrightness(0.3F);
-	        	}
-	        	else if(lux>500 && lux<10000)
-	        	{
-	        		setBrightness(0.6F);			        		
-	        	}
-	        	
-	        	else if(lux>10000 && lux <25000)
-	        	{
-	        		
-	        		setBrightness(0.8F);
-	        	}
-	        	
-	        	else if(lux>25000)
-	        	{
-	        		
-	        		setBrightness(1F);
-	        	}
-	        	String LightIntensity= String.valueOf(cal.getTime())+","+event.values[0];
-	        	String file_name="LightSensor_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            ///sendDatatoServer("LightSensor_"+dateObj,LightIntensity);
-	    		try {
-					writeToFile(f,LightIntensity);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-	    				        
-	        }
-	        else if(sensor.getType()==Sensor.TYPE_PRESSURE){				        	
-	        	
-	        	/*String Pressure= String.valueOf(cal.getTime())+","+event.values[0];
-	        	String file_name="PressureSensor_"+dateObj+".txt";
-	            File f = new File(SensorService.BASE_PATH,file_name);
-	            //sendDatatoServer("PressureSensor_"+dateObj,Pressure);
-	    		try {
-					writeToFile(f,Pressure);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}*/
-	        	
-	        }
-	     }
 	
 	
  }
-
