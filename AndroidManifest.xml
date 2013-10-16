@@ -91,7 +91,7 @@
             >
         </activity>
         <service android:name=".service.SensorService"></service>       
-        <service android:name=".service.ActivityRecognitionService"></service>
+        <service android:name=".service.ActivityRecognitionService" android:process=":remote"  ></service>
     </application>
 
 </manifest>

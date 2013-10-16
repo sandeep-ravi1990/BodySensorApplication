@@ -6,7 +6,7 @@
 		<question id = "q111" type = "radio">
 			<text>Did you DRINK ALCOHOL last night?</text>
 			<answer id = "y">yes</answer>
-			<answer id = "n" skip = "q21">no</answer>
+			<answer id = "n" skip = "q121">no</answer>
 		</question>
 		<question id = "q112" type = "number">
 			<text>How many ALCOHOLIC DRINKS did you have?</text>

@@ -55,13 +55,17 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
 	
 	private static SemDevice device;
 	String deviceAddress;
+	String deviceName;
+	String phoneAddress;
 	public static final int CHEST_SENSOR_DATA = 109;
 	public final static String BASE_PATH = "sdcard/TestResults/";
 	List<String> dataPoints=new ArrayList<String>();
 
-	public EquivitalRunnable(String address)
+	public EquivitalRunnable(String address,String name,String macAddress)
 	{
 		deviceAddress=address;
+		deviceName=name;
+		phoneAddress=macAddress;
 		SDKLicense sdk = SemDevice.getLicense();
 		sdk.applicationName = "Test Harness";
 		sdk.developerName = "Java Version";
@@ -148,7 +152,7 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
 		Calendar c=Calendar.getInstance();
 		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 		String dateObj =curFormater.format(c.getTime()); 		
-		String file_name="chestsensor_"+dateObj+".txt";	
+		String file_name="chestsensor."+deviceName+"."+dateObj+".txt";	
 		Calendar cal=Calendar.getInstance();
 		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
         File f = new File(BASE_PATH,file_name);		
@@ -159,7 +163,7 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
         	    List<String> subList = dataPoints.subList(0,56);
  	            String data=subList.toString();
  	            String formattedData=data.replaceAll("[\\[\\]]","");
- 	            sendDatatoServer("chestsensor"+dateObj,formattedData);
+ 	            sendDatatoServer("chestsensor"+"."+phoneAddress+"."+deviceName+"."+dateObj,formattedData);
  	            Log.d("Equivital","Data Point Sent");
  	            subList.clear();  
  	            subList=null;

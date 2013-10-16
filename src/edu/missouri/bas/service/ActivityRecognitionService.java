@@ -1,5 +1,23 @@
 package edu.missouri.bas.service;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.TimeZone;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
+
 import com.google.android.gms.location.ActivityRecognitionResult;
 import com.google.android.gms.location.DetectedActivity;
 
@@ -7,9 +25,18 @@ import com.google.android.gms.location.DetectedActivity;
 import android.app.AlarmManager;
 import android.app.IntentService;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Bundle;
 import android.util.Log;
+import android.widget.Toast;
 
 public class ActivityRecognitionService extends IntentService{
 
@@ -18,8 +45,12 @@ public final static String BASE_PATH = "sdcard/TestResults/";
 ActivityRecognitionResult result;
 public static int currentUserActivity=9;
 public static boolean IsRetrievingUpdates=false;
+public static boolean IsIntentSent = false;
 PendingIntent scheduleLocation;
 AlarmManager mAlarmManager;
+LocationManager mLocationManager;
+IntentFilter mIntentFilter;
+
 
 public ActivityRecognitionService() {
 super("ActivityRecognitionService");
@@ -33,49 +64,42 @@ protected void onHandleIntent(Intent intent) {
    if (ActivityRecognitionResult.hasResult(intent)) {
 	   result=null;
 	   result = ActivityRecognitionResult.extractResult(intent);
-	   setCurrentUserActivity(result.getMostProbableActivity().getType(),result.getMostProbableActivity().getConfidence());
-		//Log.d(TAG, "ActivityRecognitionResult: "+getFriendlyName(result.getMostProbableActivity().getType(),result.getMostProbableActivity().getConfidence()));
-
+	    setCurrentUserActivity(result.getMostProbableActivity().getType(),result.getMostProbableActivity().getConfidence());
+		Log.d(TAG, "ActivityRecognitionResult: "+getNameFromType(result.getMostProbableActivity().getType()));
       }
 }
 
-/**
-* When supplied with the integer representation of the activity returns the activity as friendly string
-* @param type the DetectedActivity.getType()
-* @return a friendly string of the
-*/
-public  void requestLocationUpdates()
-{
-	if(IsRetrievingUpdates!=true)
-	{
-	Intent scheduleLocationIntent = new Intent(SensorService.ACTION_SCHEDULE_LOCATION);
-	scheduleLocation = PendingIntent.getBroadcast(this, 0, scheduleLocationIntent, 0);
-	mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,0, 1000 * 60, scheduleLocation);
-	}
+
+
+@Override
+public void onDestroy() {
+	// TODO Auto-generated method stub
+	super.onDestroy();
+	
 }
 
-public void stopLocationUpdates()
-{
-	if(IsRetrievingUpdates!=false)
-	{
-	Intent locationIntent = new Intent(SensorService.ACTION_STOP_LOCATIONCONTROL);
-    this.sendBroadcast(locationIntent);
-    mAlarmManager.cancel(scheduleLocation);	
-	}
-}
-
-public static void setStatusLocationUpdates(boolean status)
-{
-	IsRetrievingUpdates=status;
-}
-
-public boolean getStatusLocationUpdates()
-{
-     return IsRetrievingUpdates;
+private String getNameFromType(int activityType) {
+    switch(activityType) {
+        case DetectedActivity.IN_VEHICLE:
+            return "in_vehicle";
+        case DetectedActivity.ON_BICYCLE:
+            return "on_bicycle";
+        case DetectedActivity.ON_FOOT:
+            return "on_foot";
+        case DetectedActivity.STILL:
+            return "still";
+        case DetectedActivity.UNKNOWN:
+            return "unknown";
+        case DetectedActivity.TILTING:
+            return "tilting";
+            
+    }
+    return "unknown";
 }
 
 public  void setCurrentUserActivity(int Activity,int Confidence)
 {
+	
 	currentUserActivity=Activity;
 	switch (currentUserActivity) {
 	case DetectedActivity.IN_VEHICLE:		
@@ -83,28 +107,23 @@ public  void setCurrentUserActivity(int Activity,int Confidence)
 	case DetectedActivity.ON_FOOT:
 		if(Confidence>=75)
 		{
-		   requestLocationUpdates();
-		   setStatusLocationUpdates(true);
+    		Intent i=new Intent("INTENT_ACTION_SCHEDULE_LOCATION");
+    		i.putExtra("activity",currentUserActivity);
+			this.sendBroadcast(i);			
 		}
-	case DetectedActivity.TILTING:				
+	case DetectedActivity.TILTING:			
 	case DetectedActivity.STILL:
-    case DetectedActivity.UNKNOWN:
-		if(Confidence>=75)
-		{
-			requestLocationUpdates();
-			setStatusLocationUpdates(true);
-		}
-	
+    case DetectedActivity.UNKNOWN:    	
 	default:
 		  //stopLocationUpdates();
   }
-	
 }
 
 @Override
 public void onCreate() {
 	// TODO Auto-generated method stub
-	super.onCreate();
-	mAlarmManager=(AlarmManager)getSystemService(Context.ALARM_SERVICE);
+	super.onCreate();	
+	
 }
+
 }

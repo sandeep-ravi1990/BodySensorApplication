@@ -64,6 +64,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -93,7 +94,11 @@ import com.equivital.sdk.connection.SemBluetoothConnection;
 import com.equivital.sdk.decoder.SDKLicense;
 import com.equivital.sdk.decoder.SemDevice;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesClient;
+import com.google.android.gms.location.ActivityRecognitionClient;
 import com.google.android.gms.location.DetectedActivity;
+import com.google.android.gms.location.LocationClient;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -106,7 +111,9 @@ import org.apache.http.util.EntityUtils;
 
 
 
-public class SensorService extends Service 
+public class SensorService extends Service implements
+GooglePlayServicesClient.ConnectionCallbacks,
+GooglePlayServicesClient.OnConnectionFailedListener
 { 
 
     private final String TAG = "SensorService";   
@@ -284,6 +291,8 @@ public class SensorService extends Service
 	DetectionRemover mDetectionRemover;
 	public static int currentUserActivity=9;
 	public static boolean IsRetrievingUpdates=false;
+	LocationClient mLocationClient;
+	
 	
 		
 	private SoundPool mSoundPool;
@@ -319,9 +328,13 @@ public class SensorService extends Service
 		serviceContext = this;
 		
 		mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-		Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL);
+		
+		mBluetoothAdapter=BluetoothAdapter.getDefaultAdapter();
+		bluetoothMacAddress=mBluetoothAdapter.getAddress();
+		
+		Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
 		Accelerometer.run();		
-		LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL);
+		LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
 		LightSensor.run();
 		
 		mAlarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
@@ -368,8 +381,11 @@ public class SensorService extends Service
                 notifyIntent, Notification.FLAG_ONGOING_EVENT);
         notification.setLatestEventInfo(SensorService.this, getString(R.string.app_name),
         		"Recording service started at: "+cal.getTime().toString(), contentIntent);
+        
         notificationManager.notify(SensorService.SERVICE_NOTIFICATION_ID, notification);
-		locationControl = new LocationControl(this, mLocationManager, 1000 * 60, 200,3000);		
+        
+       // locationControl = new LocationControl(this, mLocationManager, 1000 * 60, 200, 5000);	
+	   
 		IntentFilter activityResultFilter = 
 				new IntentFilter(XMLSurveyActivity.INTENT_ACTION_SURVEY_RESULTS);
 		SensorService.this.registerReceiver(alarmReceiver, activityResultFilter);
@@ -386,21 +402,17 @@ public class SensorService extends Service
 			e.printStackTrace();
 		}
 		prepareAlarms();
-		
-				
-		
 		Intent scheduleCheckConnection = new Intent(SensorService.ACTION_SCHEDULE_CHECK);
 		scheduleCheck = PendingIntent.getBroadcast(serviceContext, 0, scheduleCheckConnection , 0);
 		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*5,1000*60*5,scheduleCheck);
-		
-	   }
-	
-	
+		mLocationClient = new LocationClient(this, this, this);
+	}
 	
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) 
 	{
 		// TODO Auto-generated method stub	
+		mLocationClient.connect();
 		return START_NOT_STICKY;
 	}
 
@@ -412,19 +424,9 @@ public class SensorService extends Service
 		public void onReceive(Context arg0, Intent intent) {
 			// TODO Auto-generated method stub
 			String action = intent.getAction();
-			//Log.d(TAG, "Check Request Recieved");
-			int state=SemBluetoothConnection.getState();
-			
-			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){
-				if(state==0 || state==1)
-				{
-					Intent connectionIntent = new Intent();
-			        connectionIntent.setClass(serviceContext, SensorConnections.class);
-			        connectionIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					startActivity(connectionIntent);
-					Intent i=new Intent(SensorService.ACTION_START_SOUND);
-			        SensorService.serviceContext.sendBroadcast(i);			        
-				}							
+			Log.d(TAG, "Check Request Recieved");
+			//int state=SemBluetoothConnection.getState();			
+			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){									
 				Runtime info = Runtime.getRuntime();
 			    long freeSize = info.freeMemory();
 		        long totalSize= info.totalMemory();		        
@@ -434,7 +436,7 @@ public class SensorService extends Service
 		        Calendar c=Calendar.getInstance();
 				SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 				String dateObj =curFormater.format(c.getTime()); 		
-				String file_name="memory_usage_SensorService3"+dateObj+".txt";
+				String file_name="MemoryUsage_"+dateObj+".txt";
 				Calendar cal=Calendar.getInstance();
 				cal.setTimeZone(TimeZone.getTimeZone("US/Central"));			
 				
@@ -487,11 +489,7 @@ public class SensorService extends Service
 	
 	 public void startSound()
 	{  		 
-	    /*mTimer=new Timer();
-	    ss=new StartSound();
-		ss2=new StartSound2();
-		mTimer.schedule(ss,1000);
-		mTimer.schedule(ss2,1000*19);*/
+	    
 		 Intent scheduleTriggerSound = new Intent(SensorService.ACTION_TRIGGER_SOUND);
 		 Intent scheduleTriggerSound2 = new Intent(SensorService.ACTION_TRIGGER_SOUND2);
 		 triggerSound = PendingIntent.getBroadcast(serviceContext, 0, scheduleTriggerSound , 0);
@@ -541,6 +539,11 @@ public class SensorService extends Service
 		IntentFilter surveyTest =
 				new IntentFilter("ACTION_SURVEY_TEST");
 
+	/*	Intent scheduleLocationIntent = new Intent(SensorService.ACTION_SCHEDULE_LOCATION);
+		scheduleLocation = PendingIntent.getBroadcast(
+				serviceContext, 0, scheduleLocationIntent, 0);
+		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+				SystemClock.elapsedRealtime() + 10000, 1000 * 60 * 5, scheduleLocation);*/
 		
 		IntentFilter soundRequest=new IntentFilter(ACTION_START_SOUND);
 		IntentFilter checkRequest=new IntentFilter(ACTION_SCHEDULE_CHECK);
@@ -644,8 +647,8 @@ public class SensorService extends Service
 		mAlarmManager.cancel(scheduleCheck);
 		mAlarmManager.cancel(triggerSound);
 		mAlarmManager.cancel(triggerSound2);
-		
-		activityRecognition.stopActivityRecognitionScan();
+		mLocationClient.disconnect();
+		activityRecognition.stopActivityRecognitionScan();		
 		Accelerometer.stop();
 		LightSensor.stop();
 		
@@ -671,11 +674,13 @@ public class SensorService extends Service
 			
 		  if(action.equals(SensorService.ACTION_STOP_LOCATIONCONTROL)){
 				Log.d(TAG,"Stoping Location Upates");
-				locationControl.cancel();
-			}
+				}
 			else if(action.equals(SensorService.ACTION_SCHEDULE_LOCATION)){
 				Log.d(TAG,"Received alarm event - schedule location");
-				locationControl.startRecording();
+				//locationControl.startRecording();				
+				currentUserActivity=intent.getIntExtra("activity",9);
+				Location mCurrentLocation=mLocationClient.getLastLocation();
+				writeLocationToFile(mCurrentLocation);				
 			}
 			
 			else if(action.equals(SensorService.ACTION_SCHEDULE_SURVEY))
@@ -736,6 +741,7 @@ public class SensorService extends Service
 					locationMap.put("source", foundLocation.getProvider());	
 					
 					writeLocationToFile(foundLocation);
+					ActivityRecognitionService.IsRetrievingUpdates=false;
 					
 				}
 			}
@@ -801,24 +807,24 @@ public class SensorService extends Service
 		Calendar cl=Calendar.getInstance();
 		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 		String dateObj =curFormater.format(cl.getTime());
-		File f = new File(BASE_PATH,"locations_"+dateObj+".txt");
+		File f = new File(BASE_PATH,"locations."+bluetoothMacAddress+"."+dateObj+".txt");
 		
 		Calendar cal=Calendar.getInstance();
 		cal.setTimeZone(TimeZone.getTimeZone("US/Central"));	
 		toWrite = String.valueOf(cal.getTime())+","+
 			l.getLatitude()+","+l.getLongitude()+","+
-			l.getAccuracy()+","+l.getProvider();//+","+getNameFromType(currentUserActivity);
+			l.getAccuracy()+","+l.getProvider()+","+getNameFromType(currentUserActivity);
 		if(f != null){
 			try {
 				writeToFile(f, toWrite);
-				sendDatatoServer("locations_"+dateObj,toWrite);
+				sendDatatoServer("locations."+bluetoothMacAddress+"."+dateObj,toWrite);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}		
 	}
 	
-	/*private String getNameFromType(int activityType) {
+	private String getNameFromType(int activityType) {
         switch(activityType) {
             case DetectedActivity.IN_VEHICLE:
                 return "in_vehicle";
@@ -835,7 +841,7 @@ public class SensorService extends Service
                 
         }
         return "unknown";
-    }*/
+    }
 	
 	
 	protected void writeSurveyToFile(String surveyName, 
@@ -843,7 +849,7 @@ public class SensorService extends Service
 		Calendar cl=Calendar.getInstance();
 		SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
 		String dateObj =curFormater.format(cl.getTime());
-		File f = new File(BASE_PATH,surveyName+"_"+dateObj+".txt");
+		File f = new File(BASE_PATH,surveyName+"."+bluetoothMacAddress+"."+dateObj+".txt");
 		Log.d(TAG,"File: "+f.getName());
 		
 		StringBuilder sb = new StringBuilder(100);
@@ -873,7 +879,7 @@ public class SensorService extends Service
 		}
 
 		sb.append("\n");
-		sendDatatoServer(surveyName+"_"+dateObj,sb.toString());
+		sendDatatoServer(surveyName+"."+bluetoothMacAddress+"."+dateObj,sb.toString());
 		writeToFile(f,sb.toString());
 	}
 	
@@ -893,7 +899,8 @@ public class SensorService extends Service
 			if(action.equals(SensorService.ACTION_CONNECT_CHEST)){
 				Toast.makeText(getApplicationContext(),"Intent Received",Toast.LENGTH_LONG).show();
 				String address=intent.getStringExtra(KEY_ADDRESS);
-				equivitalThread=new EquivitalRunnable(address);
+				String deviceName=intent.getStringExtra("KEY_DEVICE_NAME");
+				equivitalThread=new EquivitalRunnable(address,deviceName,bluetoothMacAddress);
 				equivitalThread.run();
 				Calendar c=Calendar.getInstance();
 				SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd"); 
@@ -926,7 +933,7 @@ public class SensorService extends Service
 		if (checkDataConnectivity())
     	{
 
-        HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/writeStrToFile.php");
+        HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/Test/writeArrayToFile.php");
         List<NameValuePair> params = new ArrayList<NameValuePair>();
         //file_name 
         params.add(new BasicNameValuePair("file_name",FileName));
@@ -967,6 +974,32 @@ public class SensorService extends Service
 			return false;
 		}
 
-	
-	
+	@Override
+	public void onConnectionFailed(ConnectionResult arg0) {
+		// TODO Auto-generated method stub
+		Toast.makeText(this, "Connection Failed", Toast.LENGTH_SHORT).show();
+	}
+
+	/*
+     * Called by Location Services when the request to connect the
+     * client finishes successfully. At this point, you can
+     * request the current location or start periodic updates
+     */
+    @Override
+    public void onConnected(Bundle dataBundle) {
+        // Display the connection status
+        Toast.makeText(this, "Connected", Toast.LENGTH_SHORT).show();
+    }
+    
+    /*
+     * Called by Location Services if the connection to the
+     * location client drops because of an error.
+     */
+    @Override
+    public void onDisconnected() {
+        // Display the connection status
+        Toast.makeText(this, "Disconnected. Please re-connect.",
+                Toast.LENGTH_SHORT).show();
+    }
  }
+

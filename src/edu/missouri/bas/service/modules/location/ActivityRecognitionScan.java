@@ -78,7 +78,7 @@ public class ActivityRecognitionScan  implements GooglePlayServicesClient.Connec
 	         * Request updates, using the default detection interval.
 	         * The PendingIntent sends updates to ActivityRecognitionIntentService
 	         */
-	        getActivityRecognitionClient().requestActivityUpdates(1000,createRequestPendingIntent());
+	        getActivityRecognitionClient().requestActivityUpdates(1000*30,createRequestPendingIntent());
 
 	        // Disconnect the client
 	       // requestDisconnection();

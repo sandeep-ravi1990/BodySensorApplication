@@ -35,15 +35,17 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	int SamplingRate;
 	static int Count=0;
 	static String Temp=null;
+	String identifier;
 	List<String> dataPoints=new ArrayList<String>();
 	Calendar c=Calendar.getInstance();
     SimpleDateFormat curFormater = new SimpleDateFormat("MMMMM_dd");
 
-	public InternalSensor(SensorManager sensorManager,int sensorType,int samplingRate)
+	public InternalSensor(SensorManager sensorManager,int sensorType,int samplingRate,String uniqueIdentifier)
 	{
 	    mSensorManager = sensorManager;
 		SensorType=sensorType;
 		SamplingRate=samplingRate;
+		identifier=uniqueIdentifier;
 	}	
 	
 	
@@ -87,7 +89,7 @@ public class InternalSensor implements Runnable, SensorEventListener {
    		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) 
 	      {	
 	    		String Accelerometer_Values = getTimeStamp()+","+event.values[0]+","+event.values[1]+","+event.values[2];
-	    		String file_name="Accelerometer_"+getDate()+".txt";
+	    		String file_name="Accelerometer."+identifier+"."+getDate()+".txt";
 	            File f = new File(SensorService.BASE_PATH,file_name);	           	   
                 dataPoints.add(Accelerometer_Values+";");
 	            if(dataPoints.size()==80)
@@ -95,7 +97,7 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	            	    List<String> subList = dataPoints.subList(0,41);
 	     	            String data=subList.toString();	     	            
 	     	            String formatedData=data.replaceAll("[\\[\\]]","");		     	            
-	     	            sendDatatoServer("Accelerometer"+getDate(),formatedData);
+	     	            sendDatatoServer("Accelerometer."+identifier+"."+getDate(),formatedData);
 	     	            subList.clear(); 	     	            
 	     	    }
 	    		try {
@@ -111,7 +113,7 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	            //TODO: get values 
    				 
    				String LightIntensity= getTimeStamp()+","+event.values[0];
-	        	String file_name="LightSensor_"+getDate()+".txt";
+	        	String file_name="LightSensor."+identifier+"."+getDate()+".txt";
 	            File f = new File(SensorService.BASE_PATH,file_name);	              
                 dataPoints.add(LightIntensity+";");
 	            if(dataPoints.size()==80)
@@ -119,7 +121,7 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	            	    List<String> subList = dataPoints.subList(0,41);
 	     	            String data=subList.toString();	     	            
 	     	            String formattedData=data.replaceAll("[\\[\\]]","");		     	            
-	     	            sendDatatoServer("LightSensor"+getDate(),formattedData);
+	     	            sendDatatoServer("LightSensor."+identifier+"."+getDate(),formattedData);
 	     	            subList.clear();  
 	     	      }	            
 	    		try {

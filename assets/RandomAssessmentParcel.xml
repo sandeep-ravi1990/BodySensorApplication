@@ -13,7 +13,7 @@
 		<question id= "q521" type = "radio">
 			<text>Have you SMOKED A CIGARETTE in the PAST 15 MINUTES?</text>
 			<answer id = "y">yes</answer>
-			<answer id = "n" skip="q51">no</answer>
+			<answer id = "n" skip="q551">no</answer>
 		</question>
 	</category>
 	

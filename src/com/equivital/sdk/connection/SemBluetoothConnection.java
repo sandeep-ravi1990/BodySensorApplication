@@ -441,6 +441,7 @@ public class SemBluetoothConnection implements ISemConnection
 
     private void connectionFailed(IOException e)
     {   
+    	Log.d("SEM","Connection Failed");
     	if(reconnectionStarted!=true)
     	{
     		reconnectDevice();
@@ -455,6 +456,7 @@ public class SemBluetoothConnection implements ISemConnection
     
     private void connectionLost(IOException e)
     {     	
+    	Log.d("SEM","Connection Lost");
     	if(reconnectionStarted!=true)
     	{
     		reconnectDevice();
@@ -465,8 +467,7 @@ public class SemBluetoothConnection implements ISemConnection
     
 
     public void reconnectDevice()
-    {    	
-    	Count=0;    		    		
+    {    	    	    		    		
 		timer1=new Timer();		
 		Reconnect mReconnectDevice=new Reconnect();
 		timer1.scheduleAtFixedRate(mReconnectDevice,1000,3000);   
@@ -478,6 +479,7 @@ public class SemBluetoothConnection implements ISemConnection
 		@Override
 		public void run() {
 			// TODO Auto-generated method stub
+			Log.d("SEM","Reconnection Started");
 			if(isConnected()!=true && Count<=10)
 			{
 				     connect(equivitalAddress);
@@ -486,8 +488,9 @@ public class SemBluetoothConnection implements ISemConnection
 			}
 			else
 			{
-				reconnectionStarted=false;
-				timer1.cancel();								
+				timer1.cancel();
+				Count=0;
+				reconnectionStarted=false;												
 				if(isConnected()!=true)
 				{
 					fireConnectionClosedEvent();					

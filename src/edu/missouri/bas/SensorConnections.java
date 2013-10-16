@@ -239,6 +239,7 @@ public class SensorConnections extends Activity {
 					Toast.makeText(getApplicationContext(), "Entered the loop",Toast.LENGTH_LONG).show();
 					Intent connectChest = new Intent(SensorService.ACTION_CONNECT_CHEST);	
 					connectChest.putExtra(SensorService.KEY_ADDRESS,address);
+					connectChest.putExtra("KEY_DEVICE_NAME",device.getName());
 					this.sendBroadcast(connectChest);
 				}
 				else
