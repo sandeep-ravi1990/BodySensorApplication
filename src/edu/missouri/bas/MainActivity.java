@@ -157,14 +157,7 @@ public class MainActivity extends ListActivity {
 	    			break;
 		    	}
 			}
-
-			
-
-			
-        	
         });
-
-        
         
         if(mAdapter == null){
         	Toast.makeText(this, "Bluetooth not available", Toast.LENGTH_LONG).show();
@@ -281,8 +274,13 @@ public class MainActivity extends ListActivity {
     }
     private void startSService() {
         if (! mIsRunning) {
-            mIsRunning = true;            
-	         this.startService(new Intent(MainActivity.this,SensorService.class)); 
+        	 mIsRunning = true;            
+            Thread t = new Thread(){
+        		public void run(){
+        		getApplicationContext().startService(new Intent(MainActivity.this,SensorService.class));
+        			}
+        		 };
+          t.start();
         }
     }
     

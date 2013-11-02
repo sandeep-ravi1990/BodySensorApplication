@@ -174,6 +174,8 @@ GooglePlayServicesClient.OnConnectionFailedListener
 	
 	public static final String ACTION_SCHEDULE_LOCATION = "INTENT_ACTION_SCHEDULE_LOCATION";
 	
+	public static final String ACTION_START_SENSORS="INTENT_ACTION_START_SENSORS";
+	
 	public static final String ACTION_STOP_LOCATIONCONTROL = "INTENT_ACTION_STOP_LOCATIONCONTROL";
 	
 	public static final String ACTION_SENSOR_DATA = "INTENT_ACTION_SENSOR_DATA";
@@ -331,12 +333,6 @@ GooglePlayServicesClient.OnConnectionFailedListener
 		
 		mBluetoothAdapter=BluetoothAdapter.getDefaultAdapter();
 		bluetoothMacAddress=mBluetoothAdapter.getAddress();
-		
-		Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
-		Accelerometer.run();		
-		LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
-		LightSensor.run();
-		
 		mAlarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		
 		//Get location manager
@@ -402,12 +398,20 @@ GooglePlayServicesClient.OnConnectionFailedListener
 			e.printStackTrace();
 		}
 		prepareAlarms();
+		
+		Intent startSensors=new Intent(SensorService.ACTION_START_SENSORS);
+		this.sendBroadcast(startSensors);
+		
+		
 		Intent scheduleCheckConnection = new Intent(SensorService.ACTION_SCHEDULE_CHECK);
 		scheduleCheck = PendingIntent.getBroadcast(serviceContext, 0, scheduleCheckConnection , 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*5,1000*60*5,scheduleCheck);
+		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*10,1000*60*5,scheduleCheck);
 		mLocationClient = new LocationClient(this, this, this);
 	}
 	
+	
+	
+
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) 
 	{
@@ -426,7 +430,8 @@ GooglePlayServicesClient.OnConnectionFailedListener
 			String action = intent.getAction();
 			Log.d(TAG, "Check Request Recieved");
 			//int state=SemBluetoothConnection.getState();			
-			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){									
+			if(action.equals(SensorService.ACTION_SCHEDULE_CHECK)){	
+				
 				Runtime info = Runtime.getRuntime();
 			    long freeSize = info.freeMemory();
 		        long totalSize= info.totalMemory();		        
@@ -448,17 +453,25 @@ GooglePlayServicesClient.OnConnectionFailedListener
 						writeToFile(f, dataToWrite);
 					} catch (IOException e) {
 						e.printStackTrace();
-					}				
-					
-				}	
-				
-				
+					}
+				}
+			}
+			else if(action.equals(SensorService.ACTION_START_SENSORS))
+			{
+				sensorThread.run();
 			}
 		}
 		
 	};
         
-	
+	private Runnable sensorThread = new Runnable() {
+	    public void run() {
+	    	Accelerometer=new InternalSensor(mSensorManager,Sensor.TYPE_ACCELEROMETER,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
+			Accelerometer.run();
+			LightSensor=new InternalSensor(mSensorManager,Sensor.TYPE_LIGHT,SensorManager.SENSOR_DELAY_NORMAL,bluetoothMacAddress);
+			LightSensor.run();
+	    }
+	};
 	
 	BroadcastReceiver soundRequestReceiver = new BroadcastReceiver() {
 
@@ -547,6 +560,7 @@ GooglePlayServicesClient.OnConnectionFailedListener
 		
 		IntentFilter soundRequest=new IntentFilter(ACTION_START_SOUND);
 		IntentFilter checkRequest=new IntentFilter(ACTION_SCHEDULE_CHECK);
+		IntentFilter startSensors=new IntentFilter(ACTION_START_SENSORS);
 		IntentFilter locationFoundFilter = new IntentFilter(LocationControl.INTENT_ACTION_LOCATION);
 		IntentFilter sound1=new IntentFilter(ACTION_TRIGGER_SOUND);
 		IntentFilter sound2=new IntentFilter(ACTION_TRIGGER_SOUND2);
@@ -559,6 +573,7 @@ GooglePlayServicesClient.OnConnectionFailedListener
 		SensorService.this.registerReceiver(soundRequestReceiver,sound1);
 		SensorService.this.registerReceiver(soundRequestReceiver,sound2);
 		SensorService.this.registerReceiver(checkRequestReceiver,checkRequest);
+		SensorService.this.registerReceiver(checkRequestReceiver,startSensors);
 		IntentFilter chestSensorData = new IntentFilter(ACTION_CONNECT_CHEST);
 		SensorService.this.registerReceiver(chestSensorReceiver,chestSensorData);
 		}
