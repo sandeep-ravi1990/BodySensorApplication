@@ -405,7 +405,7 @@ GooglePlayServicesClient.OnConnectionFailedListener
 		
 		Intent scheduleCheckConnection = new Intent(SensorService.ACTION_SCHEDULE_CHECK);
 		scheduleCheck = PendingIntent.getBroadcast(serviceContext, 0, scheduleCheckConnection , 0);
-		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*10,1000*60*5,scheduleCheck);
+		mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+1000*60*5,1000*60*5,scheduleCheck);
 		mLocationClient = new LocationClient(this, this, this);
 	}
 	
