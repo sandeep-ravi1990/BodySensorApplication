@@ -21,6 +21,7 @@ import org.apache.http.util.EntityUtils;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -48,7 +49,6 @@ import com.equivital.sdk.decoder.events.SEMDateTimeDataEventArgs;
 import com.equivital.sdk.decoder.events.SemSummaryDataEventArgs;
 import com.equivital.sdk.decoder.events.SynchronisationTimerEventArgs;
 import com.google.android.gms.location.DetectedActivity;
-
 import edu.missouri.bas.service.SensorService;
 
 public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
@@ -163,7 +163,9 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
         	    List<String> subList = dataPoints.subList(0,56);
  	            String data=subList.toString();
  	            String formattedData=data.replaceAll("[\\[\\]]","");
- 	            sendDatatoServer("chestsensor"+"."+phoneAddress+"."+deviceName+"."+dateObj,formattedData);
+ 	            //sendDatatoServer("chestsensor"+"."+phoneAddress+"."+deviceName+"."+dateObj,formattedData);
+ 	            TransmitData transmitData=new TransmitData();
+	            transmitData.execute("chestsensor"+"."+phoneAddress+"."+deviceName+"."+dateObj,formattedData);
  	            Log.d("Equivital","Data Point Sent");
  	            subList.clear();  
  	            subList=null;
@@ -177,8 +179,53 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
 			
 		}	
 	}
+	
+	private class TransmitData extends AsyncTask<String,Void, Boolean>
+	{
 
-	public static void sendDatatoServer(String FileName,String DataToSend)
+		@Override
+		protected Boolean doInBackground(String... strings) {
+			// TODO Auto-generated method stub
+			 String fileName=strings[0];
+	         String dataToSend=strings[1];
+	         if(checkDataConnectivity())
+	 		{
+	 		
+	         HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/Test/writeArrayToFile.php");
+	         List<NameValuePair> params = new ArrayList<NameValuePair>();
+	         //file_name 
+	         params.add(new BasicNameValuePair("file_name",fileName));        
+	         //data                       
+	         params.add(new BasicNameValuePair("data",dataToSend));
+	         try {
+	         	        	
+	             request.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
+	             HttpResponse response = new DefaultHttpClient().execute(request);
+	             if(response.getStatusLine().getStatusCode() == 200){
+	                 String result = EntityUtils.toString(response.getEntity());
+	                 Log.d("Sensor Data Point Info",result);                
+	                // Log.d("Wrist Sensor Data Point Info","Data Point Successfully Uploaded!");
+	             }
+	             return true;
+	         } 
+	         catch (Exception e) 
+	         {	             
+	             e.printStackTrace();
+	             return false;
+	         }
+	 	  }
+	     	
+	     else 
+	     {
+	     	Log.d("Sensor Data Point Info","No Network Connection:Data Point was not uploaded");
+	     	return false;
+	      } 
+		    
+		}
+		
+	}
+
+	/*public static void sendDatatoServer(String FileName,String DataToSend)
 	{
 		if(checkDataConnectivity())
 		{
@@ -205,7 +252,7 @@ public class EquivitalRunnable implements Runnable, ISemDeviceSummaryEvents {
     else {
     	Log.d("Chest Sensor Data Point Info","No Network Connection:Data Point was not uploaded");        
     	 }
-    }
+    }*/
 	
 	protected static boolean checkDataConnectivity() {
     	

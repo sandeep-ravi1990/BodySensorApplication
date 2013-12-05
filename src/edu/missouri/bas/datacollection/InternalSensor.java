@@ -24,6 +24,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.AsyncTask;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
@@ -96,8 +97,10 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	            {
 	            	    List<String> subList = dataPoints.subList(0,41);
 	     	            String data=subList.toString();	     	            
-	     	            String formatedData=data.replaceAll("[\\[\\]]","");		     	            
-	     	            sendDatatoServer("Accelerometer."+identifier+"."+getDate(),formatedData);
+	     	            String formattedData=data.replaceAll("[\\[\\]]","");		     	            
+	     	            //sendDatatoServer("Accelerometer."+identifier+"."+getDate(),formatedData);
+	     	            TransmitData transmitData=new TransmitData();
+	     	            transmitData.execute("Accelerometer."+identifier+"."+getDate(),formattedData);
 	     	            subList.clear(); 	     	            
 	     	    }
 	    		try {
@@ -121,7 +124,9 @@ public class InternalSensor implements Runnable, SensorEventListener {
 	            	    List<String> subList = dataPoints.subList(0,41);
 	     	            String data=subList.toString();	     	            
 	     	            String formattedData=data.replaceAll("[\\[\\]]","");		     	            
-	     	            sendDatatoServer("LightSensor."+identifier+"."+getDate(),formattedData);
+	     	            //sendDatatoServer("LightSensor."+identifier+"."+getDate(),formattedData);
+	     	            TransmitData transmitData=new TransmitData();
+	     	            transmitData.execute("LightSensor."+identifier+"."+getDate(),formattedData);
 	     	            subList.clear();  
 	     	      }	            
 	    		try {
@@ -132,7 +137,7 @@ public class InternalSensor implements Runnable, SensorEventListener {
 				}
 	    				        
 	       }
-	       
+   		
 	}
 	
 	protected static void writeToFile(File f, String toWrite) throws IOException{
@@ -154,9 +159,52 @@ public class InternalSensor implements Runnable, SensorEventListener {
 		mSensorManager.unregisterListener(this);
 	}	
 	
+	private class TransmitData extends AsyncTask<String,Void, Boolean>
+	{
+
+		@Override
+		protected Boolean doInBackground(String... strings) {
+			// TODO Auto-generated method stub
+			 String fileName=strings[0];
+	         String dataToSend=strings[1];
+	         if(checkDataConnectivity())
+	 		{
+	 		
+	         HttpPost request = new HttpPost("http://babbage.cs.missouri.edu/~rs79c/Android/Test/writeArrayToFile.php");
+	         List<NameValuePair> params = new ArrayList<NameValuePair>();
+	         //file_name 
+	         params.add(new BasicNameValuePair("file_name",fileName));        
+	         //data                       
+	         params.add(new BasicNameValuePair("data",dataToSend));
+	         try {
+	         	        	
+	             request.setEntity(new UrlEncodedFormEntity(params, HTTP.UTF_8));
+	             HttpResponse response = new DefaultHttpClient().execute(request);
+	             if(response.getStatusLine().getStatusCode() == 200){
+	                 String result = EntityUtils.toString(response.getEntity());
+	                 Log.d("Sensor Data Point Info",result);                
+	                // Log.d("Wrist Sensor Data Point Info","Data Point Successfully Uploaded!");
+	             }
+	             return true;
+	         } 
+	         catch (Exception e) 
+	         {	             
+	             e.printStackTrace();
+	             return false;
+	         }
+	 	  }
+	     	
+	     else 
+	     {
+	     	Log.d("Sensor Data Point Info","No Network Connection:Data Point was not uploaded");
+	     	return false;
+	      } 
+		    
+		}
+		
+	}
 	
-	
-	public static void sendDatatoServer(String FileName,String DataToSend)
+	/*public static void sendDatatoServer(String FileName,String DataToSend)
 	{
 		if(checkDataConnectivity())
 		{
@@ -186,5 +234,5 @@ public class InternalSensor implements Runnable, SensorEventListener {
     	Log.d("Sensor Data Point Info","No Network Connection:Data Point was not uploaded");
         
     	 }
-    }
+    }*/
 }

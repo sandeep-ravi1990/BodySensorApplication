@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence-diagram version="1.1.4" icons="true">  
+  <object id="1" language="java" name="edu.missouri.bas.MainActivity" project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/MainActivity.java" binary="false" label="mainActivity" 
+    type="class" autoSize="true">    
+    <position height="-1" width="-1" x="158" y="0"/>    
+    <execution id="2">      
+      <position height="63" width="91" x="5" y="100"/>    
+    </execution>    
+    <execution id="5">      
+      <position height="63" width="91" x="5" y="173"/>    
+    </execution>  
+  </object>  
+  <object id="8" language="java" name="edu.missouri.bas.service.SensorService" project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/service/SensorService.java" binary="false" label="sensorService" 
+    type="class" autoSize="true">    
+    <position height="0" width="0" x="0" y="0"/>    
+    <execution id="4">      
+      <position height="21" width="112" x="100" y="121"/>    
+    </execution>    
+    <execution id="9">      
+      <position height="21" width="112" x="100" y="447"/>    
+    </execution>    
+    <execution id="10">      
+      <position height="63" width="112" x="100" y="497"/>    
+    </execution>    
+    <execution id="13">      
+      <position height="63" width="112" x="100" y="611"/>    
+    </execution>    
+    <execution id="16">      
+      <position height="63" width="112" x="100" y="712"/>    
+    </execution>  
+  </object>  
+  <object id="19" language="java" name="edu.missouri.bas.SensorConnections" project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/SensorConnections.java" binary="false" label="sensorConnections" 
+    type="class" autoSize="true">    
+    <position height="-1" width="-1" x="333" y="0"/>    
+    <execution id="7">      
+      <position height="21" width="135" x="216" y="194"/>    
+    </execution>    
+    <execution id="20">      
+      <position height="63" width="135" x="216" y="220"/>    
+    </execution>    
+    <execution id="23">      
+      <position height="21" width="135" x="216" y="392"/>    
+    </execution>    
+    <execution id="24">      
+      <position height="63" width="135" x="216" y="426"/>    
+    </execution>  
+  </object>  
+  <object id="26" language="java" name="edu.missouri.bas.activities.DeviceListActivity" project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/activities/DeviceListActivity.java" binary="false" 
+    label="deviceListActivity" type="class" autoSize="true">    
+    <position height="-1" width="-1" x="355" y="0"/>    
+    <execution id="22">      
+      <position height="21" width="123" x="355" y="241"/>    
+    </execution>    
+    <execution id="27">      
+      <position height="84" width="0" x="0" y="280"/>    
+    </execution>    
+    <execution id="29">      
+      <position height="21" width="0" x="0" y="322"/>    
+    </execution>    
+    <execution id="30">      
+      <position height="63" width="123" x="355" y="371"/>    
+    </execution>  
+  </object>  
+  <object id="32" language="java" name="edu.missouri.bas.bluetooth.equivital.EquivitalRunnable" 
+    project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/bluetooth/equivital/EquivitalRunnable.java" binary="false" 
+    label="equivitalRunnable" type="class" autoSize="true">    
+    <position height="-1" width="-1" x="473" y="0"/>    
+    <execution id="12">      
+      <position height="21" width="157" x="482" y="518"/>    
+    </execution>    
+    <execution id="33">      
+      <position height="84" width="157" x="482" y="548"/>    
+    </execution>    
+    <execution id="35">      
+      <position height="21" width="157" x="482" y="590"/>    
+    </execution>  
+  </object>  
+  <object id="36" language="java" name="edu.missouri.bas.bluetooth.affectiva.AffectivaRunnable" 
+    project="BodySensorApplication" 
+    file="/BodySensorApplication/src/edu/missouri/bas/bluetooth/affectiva/AffectivaRunnable.java" binary="false" 
+    label="affectivaRunnable" type="class" autoSize="true">    
+    <position height="-1" width="-1" x="592" y="0"/>    
+    <execution id="15">      
+      <position height="21" width="161" x="643" y="632"/>    
+    </execution>    
+    <execution id="18">      
+      <position height="21" width="161" x="643" y="733"/>    
+    </execution>    
+    <execution id="37">      
+      <position height="84" width="161" x="643" y="665"/>    
+    </execution>    
+    <execution id="39">      
+      <position height="21" width="161" x="643" y="707"/>    
+    </execution>  
+  </object>  
+  <message id="3" operation="startService(android.content.Intent):android.content.ComponentName">    
+    <end type="SOURCE" refId="2"/>    
+    <end type="TARGET" refId="4"/>  
+  </message>  
+  <message id="6" operation="startActivity(android.content.Intent):void">    
+    <end type="SOURCE" refId="5"/>    
+    <end type="TARGET" refId="7"/>  
+  </message>  
+  <message id="11" operation="run():void">    
+    <end type="SOURCE" refId="10"/>    
+    <end type="TARGET" refId="12"/>  
+  </message>  
+  <message id="14" operation="startRecording():void">    
+    <end type="SOURCE" refId="13"/>    
+    <end type="TARGET" refId="15"/>  
+  </message>  
+  <message id="17" operation="getState():int">    
+    <end type="SOURCE" refId="16"/>    
+    <end type="TARGET" refId="18"/>  
+  </message>  
+  <message id="21" operation="onCreate(android.os.Bundle):void">    
+    <end type="SOURCE" refId="20"/>    
+    <end type="TARGET" refId="22"/>  
+  </message>  
+  <message id="25" operation="startIntentSender(android.content.IntentSender,android.content.Intent,int,int,int):void">    
+    <end type="SOURCE" refId="24"/>    
+    <end type="TARGET" refId="9"/>  
+  </message>  
+  <message id="28" operation="doDiscovery():void">    
+    <end type="SOURCE" refId="27"/>    
+    <end type="TARGET" refId="29"/>  
+  </message>  
+  <message id="31" operation="onActivityResult(int,int,android.content.Intent):void">    
+    <end type="SOURCE" refId="30"/>    
+    <end type="TARGET" refId="23"/>  
+  </message>  
+  <message id="34" 
+    operation="summaryDataUpdated(com.equivital.sdk.decoder.SemDevice,com.equivital.sdk.decoder.events.SemSummaryDataEventArgs):void">    
+    <end type="SOURCE" refId="33"/>    
+    <end type="TARGET" refId="35"/>  
+  </message>  
+  <message id="38" operation="setState(int):void">    
+    <end type="SOURCE" refId="37"/>    
+    <end type="TARGET" refId="39"/>  
+  </message>
+</sequence-diagram>
